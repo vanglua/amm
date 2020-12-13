@@ -7,8 +7,7 @@ use near_sdk::{
     AccountId, 
     env,
     collections::{
-        UnorderedMap,
-        Vector
+        UnorderedMap
     },
     borsh::{
         BorshDeserialize,
@@ -56,7 +55,7 @@ impl PoolFactory {
     }
 
     pub fn get_pool_swap_fee(&self, pool_id: U64) -> U128 {
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         U128(pool.get_swap_fee())
     }
 
@@ -81,7 +80,6 @@ impl PoolFactory {
         denorm_weights: Vec<U128>
     ) {
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
-        let total_in_u128 = u128::from(total_in);
 
         pool.bind_pool(
             &env::predecessor_account_id(), 

@@ -109,7 +109,7 @@ fn overflow_gas_limit_tests() {
     let divisor = 8;
 
     let pool_id = contract.new_pool(divisor, swap_fee());
-    let weight = to_token_denom(1) / divisor as u128;
+    let weight = to_token_denom(1) / u128::from(divisor);
     let collat = to_token_denom(1_000_000_000);
     let mut outcome_weights = vec![];
 
@@ -119,7 +119,7 @@ fn overflow_gas_limit_tests() {
 
     contract.bind_pool(pool_id, U128(collat), outcome_weights);
 
-    let expected_price = to_token_denom(1) / divisor as u128;
+    let expected_price = to_token_denom(1) / u128::from(divisor);
     let price_0: u128 = contract.get_spot_price_sans_fee(pool_id, 0).into();
 
     assert_eq!(expected_price, price_0);
