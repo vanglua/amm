@@ -65,7 +65,7 @@ fn get_context(
         block_timestamp,
         account_locked_balance: 0,
         attached_deposit: 0,
-        prepaid_gas: 10_u64.pow(16),
+        prepaid_gas: 30000000000000000,
         random_seed: vec![0, 1, 2],
         output_data_receivers: vec![],
     }

@@ -4,50 +4,9 @@ use crate::constants::{
     MAX_POW_BASE,
     POW_PRECISION
 };
-use uint::construct_uint;
+use crate::u256;
 
-construct_uint! {
-    /// 256-bit unsigned integer.
-    pub struct u256(4);
-}
-
-/**********************************************************************************************
-// calcSpotPrice                                                                             //
-// sP = spotPrice                                                                            //
-// bI = tokenBalanceIn                ( bI / wI )         1                                  //
-// bO = tokenBalanceOut         sP =  -----------  *  ----------                             //
-// wI = tokenWeightIn                 ( bO / wO )     ( 1 - sF )                             //
-// wO = tokenWeightOut                                                                       //
-// sF = swapFee                                                                              //
-**********************************************************************************************/
-
-/**********************************************************************************************
-// calcSpotPrice                                                                             //
-// sP = spotPrice                                                                            //
-// bI = tokenBalanceIn                (   ob    )         1                                  //
-// bO = tokenBalanceOut         sP =  -----------  *  ----------                             //
-// wI = tokenWeightIn                 ( tb - ob )     ( 1 - sF )                             //
-// wO = tokenWeightOut                                                                       //
-// sF = swapFee                                                                              //
-**********************************************************************************************/
-
-// pub fn calc_spot_price(
-//     token_balance_out: u128,
-//     total_balance: u128,
-//     swap_fee: u128
-// ) -> u128 {
-//     println!("bal out: {} tot bal: {}", token_balance_out, total_balance);
-//     let numer = token_balance_out;
-//     let denom = total_balance;
-//     let ratio = TOKEN_DENOM - div_u128(numer, denom);
-//     let scale = div_u128(TOKEN_DENOM, TOKEN_DENOM - swap_fee);
-    
-//     mul_u128(ratio, scale)
-// }
-
-
-
-/**
+/***
 token_amt = token_out * 10 ** 18
 for poolbalances {
     if not my pool balance {
@@ -57,7 +16,7 @@ for poolbalances {
 
     return token_out_b + investment_amt - (token_amt / 10 ** 18)
 }
-    */
+***/
 
 /**********************************************************************************************
 // calcOutGivenIn                                                                            //
@@ -178,12 +137,19 @@ pub fn pow_u128(
 }
 
 
-
 pub fn div_u128(a: u128, b: u128) -> u128 {
     let a_u256 = u256::from(a);
     
     let token_denom_u256 = u256::from(TOKEN_DENOM);
     let c0 = a_u256 * token_denom_u256;
+    let c1 = c0 + (b / 2);
+
+    (c1 / b).as_u128()
+}
+
+pub fn div_u256_to_u128(a: u256, b: u256) -> u128 {
+    let token_denom_u256 = u256::from(TOKEN_DENOM);
+    let c0 = a * token_denom_u256;
     let c1 = c0 + (b / 2);
 
     (c1 / b).as_u128()
@@ -198,8 +164,15 @@ pub fn mul_u128(a: u128, b: u128) -> u128 {
 
     let c1 = c0 + (token_denom_u256 / 2);
 
-    println!("get here7");
-    
-    println!("divving :{}", (c1 / b).as_u128());
     (c1 / token_denom_u256).as_u128()
+}
+
+pub fn mul_u256(a: u256, b: u256) -> u256 {
+    let token_denom_u256 = u256::from(TOKEN_DENOM);
+
+    let c0: u256 = a * b;
+
+    let c1 = c0 + (token_denom_u256 / 2);
+
+    c1 / token_denom_u256
 }

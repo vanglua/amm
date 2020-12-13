@@ -3,8 +3,8 @@ pub const TOKEN_DENOM: u128 = 1_000_000_000_000_000_000;
 pub const MIN_FEE: u128= TOKEN_DENOM / 1_000_000;
 pub const MAX_FEE: u128 = TOKEN_DENOM / 10;
 
-pub const MIN_BOUND_TOKENS: u64 = 2;
-pub const MAX_BOUND_TOKENS: u64 = 8;
+pub const MIN_BOUND_TOKENS: u16 = 2;
+pub const MAX_BOUND_TOKENS: u16 = 8;
 
 pub const MAX_WEIGHT: u128 = TOKEN_DENOM * 50;
 pub const MIN_WEIGHT: u128 = TOKEN_DENOM;

@@ -7,6 +7,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[macro_use]
 #[allow(dead_code)]
+use uint::construct_uint;
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct u256(4);
+}
+
 mod vault_token;
 mod pool;
 mod pool_factory;

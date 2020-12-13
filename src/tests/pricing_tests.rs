@@ -78,21 +78,43 @@ fn multi_outcome_pool_pricing_test() {
 }
 
 #[test]
-fn overflow_limit_checks() {
+fn fee_test_calc() {
+    let context = get_context(alice(), 0);
+    testing_env!(context);
+    let mut contract = PoolFactory::init(alice());
+
+    let pool_id = contract.new_pool(2, swap_fee());
+    let half = to_token_denom(1) / 2;
+
+    contract.bind_pool(pool_id, U128(to_token_denom(100)), vec![U128(half), U128(half)]);
+    
+    let even_price: u128 = contract.get_spot_price(pool_id, 0).into();
+
+    let swap_fee: u128 = contract.get_pool_swap_fee(pool_id).into();
+    let scale = math::div_u128(to_token_denom(1), to_token_denom(1) - swap_fee);
+    let half_plus_fee = math::mul_u128(half, scale);
+
+    assert_eq!(even_price, half_plus_fee);
+
+}
+
+
+#[test]
+fn overflow_gas_limit_tests() {
     // Even pool
     let context = get_context(alice(), 0);
     testing_env!(context);
     let mut contract = PoolFactory::init(alice());
     
-    let divisor = 10;
+    let divisor = 8;
 
     let pool_id = contract.new_pool(divisor, swap_fee());
-    let hundreth = to_token_denom(1) / divisor as u128;
+    let weight = to_token_denom(1) / divisor as u128;
     let collat = to_token_denom(1_000_000_000);
     let mut outcome_weights = vec![];
 
-    for i in 0..divisor {
-        outcome_weights.push(U128(hundreth));
+    for _ in 0..divisor {
+        outcome_weights.push(U128(weight));
     }
 
     contract.bind_pool(pool_id, U128(collat), outcome_weights);
@@ -103,4 +125,3 @@ fn overflow_limit_checks() {
     assert_eq!(expected_price, price_0);
 
 }
-

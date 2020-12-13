@@ -14,6 +14,7 @@ use near_sdk::{
 
 use crate::math;
 use crate::constants;
+use crate::u256;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Pool {
@@ -33,7 +34,9 @@ impl Pool {
         num_of_outcomes: u16, 
         swap_fee: u128
     ) -> Self {
-        assert!(num_of_outcomes > 1, "ERR_MIN_OUTCOMES");
+        assert!(num_of_outcomes >= constants::MIN_BOUND_TOKENS, "ERR_MIN_OUTCOMES");
+        assert!(num_of_outcomes <= constants::MAX_BOUND_TOKENS, "ERR_MAX_OUTCOMES");
+
         Self {
             owner: sender,
             outcome_balances: UnorderedMap::new(format!("pool::{}", pool_id).as_bytes().to_vec()),
@@ -43,6 +46,10 @@ impl Pool {
             swap_fee,
             collateral: 0,
         }
+    }
+
+    pub fn get_swap_fee(&self) -> u128 {
+        self.swap_fee
     }
 
     // TODO: Test type convertion w/ into / iter 
@@ -88,9 +95,12 @@ impl Pool {
         &self,
         target_outcome: u16
     ) -> u128 {
-        let mut odds_weight_for_target = 0;
-        let mut odds_weight_sum = 0;
-        for (outcome, balance) in self.outcome_balances.iter() {
+        let zero = u256::from(0);
+
+        let mut odds_weight_for_target = zero;
+        let mut odds_weight_sum = zero;
+
+        for (outcome, _) in self.outcome_balances.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
             odds_weight_sum += weight_for_outcome;
 
@@ -100,42 +110,45 @@ impl Pool {
         } 
 
         // TODO Mul by 1 - fee
-        math::div_u128(odds_weight_for_target, odds_weight_sum) 
+        let ratio = math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum);
+        let scale = math::div_u128(constants::TOKEN_DENOM, constants::TOKEN_DENOM - self.swap_fee);
+
+        math::mul_u128(ratio, scale)
     }
 
     pub fn get_spot_price_sans_fee(
         &self,
         target_outcome: u16
     ) -> u128 {
-        let mut odds_weight_for_target = 0;
-        let mut odds_weight_sum = 0;
-        println!("get here");
-        // self.get_odds_weight_for_outcome(outcome);
-        for (outcome, balance) in self.outcome_balances.iter() {
-            println!("get here2");
+        let zero = u256::from(0);
+
+        let mut odds_weight_for_target = zero;
+        let mut odds_weight_sum = zero;
+
+        for (outcome, _) in self.outcome_balances.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
-            println!("get here3");
             odds_weight_sum += weight_for_outcome;
 
             if outcome == target_outcome {
                 odds_weight_for_target = weight_for_outcome;
             }
         } 
-        
-        math::div_u128(odds_weight_for_target, odds_weight_sum) 
+
+        math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum) 
     }
 
     fn get_odds_weight_for_outcome(
         &self,
         target_outcome: u16
-    ) -> u128 {
-        let mut odds_weight_for_target = 0;
+    ) -> u256 {
+        let zero = u256::from(0);
+        let mut odds_weight_for_target: u256 = zero;
 
         for (outcome, balance) in self.outcome_balances.iter() {
             if outcome != target_outcome {
                 odds_weight_for_target = match odds_weight_for_target {
-                    0 => balance,
-                    _ => math::mul_u128(odds_weight_for_target, balance)
+                    zero => u256::from(balance),
+                    _ => math::mul_u256(odds_weight_for_target, u256::from(balance))
                 };
             }
         }
