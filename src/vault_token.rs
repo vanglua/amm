@@ -66,27 +66,36 @@ trait ExtSelf {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct Token {
+pub struct MintableToken {
     pub accounts: LookupMap<AccountId, Balance>,
     pub total_supply: Balance,
 }
 
-impl Token {
-    pub fn new(pool_id: u64) -> Self {
+impl MintableToken {
+    pub fn new(pool_id: u64, outcome_id: u16, initial_supply: u128) -> Self {
+        let mut accounts: LookupMap<AccountId, Balance> = LookupMap::new(format!("balance:token:{}:{}", pool_id, outcome_id).as_bytes().to_vec()); 
+        accounts.insert(&env::current_account_id(), &initial_supply);
+
         Self {
-            total_supply: 0,
-            accounts: LookupMap::new(format!("balance:token:{}", pool_id).as_bytes().to_vec()),
+            total_supply: initial_supply,
+            accounts: accounts,
         }
     }
 
-    pub fn mint(&mut self, amount: u128, account_id: &AccountId) {
+    pub fn mint_internal(&mut self, amount: u128, account_id: &AccountId) {
         self.total_supply += amount;
         let account_balance = self.accounts.get(account_id).unwrap_or(0);
         let new_balance = account_balance + amount;
         self.accounts.insert(account_id, &new_balance);
     }
 
-    pub fn faux_burn(&mut self, amount: u128) {
+    pub fn burn_internal(&mut self, amount: u128, account_id: &AccountId) {
+        let mut balance = self.accounts.get(&account_id).unwrap_or(0);
+
+        assert!(balance >= amount, "ERR_LOW_BALANCE");
+
+        balance -= amount;
+        self.accounts.insert(account_id, &balance);
         self.total_supply -= amount;
     }
 
@@ -108,23 +117,23 @@ impl Token {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct FungibleTokenVault {
-    token: Token,
+pub struct MintableFungibleTokenVault {
+    token: MintableToken,
     vaults: LookupMap<VaultId, Vault>,
     next_vault_id: VaultId,
 }
 
-impl Default for FungibleTokenVault {
+impl Default for MintableFungibleTokenVault {
     fn default() -> Self {
         panic!("Contract should be initialized before usage")
     }
 }
 
-impl FungibleTokenVault {
-    pub fn new(pool_id: u64) -> Self {
+impl MintableFungibleTokenVault {
+    pub fn new(pool_id: u64, outcome_id: u16, initial_supply: u128) -> Self {
         Self {
-            token: Token::new(pool_id),
-            vaults: LookupMap::new(format!("vault:token:{}", pool_id).as_bytes().to_vec()),
+            token: MintableToken::new(pool_id, outcome_id, initial_supply),
+            vaults: LookupMap::new(format!("vault:token:{}:{}", pool_id, outcome_id).as_bytes().to_vec()),
             next_vault_id: VaultId(0),
         }
     }
@@ -137,20 +146,25 @@ impl FungibleTokenVault {
         self.token.total_supply
     }
 
-    pub fn mint(&mut self, amount: u128, account_id: &AccountId) {
-        self.token.mint(amount, account_id);
+    pub fn mint_internal(&mut self, amount: u128, account_id: &AccountId) {
+        self.token.mint_internal(amount, account_id);
     }
 
-    pub fn faux_burn(&mut self, amount: u128) {
-        self.token.faux_burn(amount);
+    pub fn burn_internal(&mut self, amount: u128, account_id: &AccountId) {
+        self.token.burn_internal(amount, account_id);
     }
 
-    pub fn transfer_unsafe(&mut self, receiver_id: &AccountId, amount: u128) {
+    pub fn transfer_no_vault(&mut self, receiver_id: &AccountId, amount: u128) {
         self.token.withdraw(&env::predecessor_account_id(), amount);
         self.token.deposit(receiver_id, amount);
     }
 
-    pub fn transfer_with_safe(&mut self, receiver_id: &AccountId, amount: u128, payload: String) -> Promise {
+    pub fn safe_transfer_from_internal(&mut self, sender: &AccountId, receiver_id: &AccountId, amount: u128) {
+        self.token.withdraw(sender, amount);
+        self.token.deposit(receiver_id, amount);
+    }
+
+    pub fn transfer_with_vault(&mut self, receiver_id: &AccountId, amount: u128, payload: String) -> Promise {
         let gas_to_receiver = env::prepaid_gas().saturating_sub(GAS_FOR_REMAINING_COMPUTE + GAS_FOR_CALLBACK);
         let vault_id = self.next_vault_id;
         let sender_id = env::predecessor_account_id();

@@ -49,7 +49,7 @@ fn get_context(
 ) -> VMContext {
 
     VMContext {
-        current_account_id: alice(),
+        current_account_id: "contract".to_string(),
         signer_account_id: bob(),
         signer_account_pk: vec![0, 1, 2],
         predecessor_account_id,
@@ -71,3 +71,5 @@ fn get_context(
 mod init_tests;
 mod pool_initiation_tests;
 mod pricing_tests;
+mod swap_tests;
+mod liquidity_tests;

@@ -1,9 +1,9 @@
 use near_sdk::{
+    env,
     json_types::{ U128 },
     AccountId,
     collections::{
-        UnorderedMap,
-        Vector
+        UnorderedMap
 	},
     borsh::{
         self,
@@ -15,16 +15,19 @@ use near_sdk::{
 use crate::math;
 use crate::constants;
 use crate::u256;
+use crate::vault_token::MintableFungibleTokenVault;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Pool {
+    id: u64,
     owner: AccountId,
-    outcome_balances: UnorderedMap<u16, u128>,
+    outcome_tokens: UnorderedMap<u16, MintableFungibleTokenVault>,
     num_of_outcomes: u16,
-    outcome_tokens_sum: u128,
     collateral: u128,
     swap_fee: u128,
+    fee_pool: u128,
     finalized: bool,
+    pool_token: MintableFungibleTokenVault,
 }
 
 impl Pool {
@@ -38,13 +41,15 @@ impl Pool {
         assert!(num_of_outcomes <= constants::MAX_BOUND_TOKENS, "ERR_MAX_OUTCOMES");
 
         Self {
+            id: pool_id,
             owner: sender,
-            outcome_balances: UnorderedMap::new(format!("pool::{}", pool_id).as_bytes().to_vec()),
+            outcome_tokens: UnorderedMap::new(format!("pool::{}", pool_id).as_bytes().to_vec()),
             finalized: false,
             num_of_outcomes,
-            outcome_tokens_sum: 0,
             swap_fee,
+            fee_pool: 0,
             collateral: 0,
+            pool_token: MintableFungibleTokenVault::new(pool_id, num_of_outcomes, 0)
         }
     }
 
@@ -52,33 +57,100 @@ impl Pool {
         self.swap_fee
     }
 
-    // TODO: Test type convertion w/ into / iter 
-    // TODO: Some rounding discrepancy when uneven amounts of money, change weight / payment factor
-    pub fn bind_pool(
+    pub fn get_balance(&self, outcome: u16) -> u128 {
+        self.outcome_tokens
+            .get(&outcome)
+            .expect("ERR_NO_OUTCOME")
+            .get_balance(&env::current_account_id())
+    }
+
+    pub fn get_pool_token_balance(&self, owner_id: &AccountId) -> u128 {
+        self.pool_token.get_balance(owner_id)
+    }
+
+    pub fn get_pool_balances(&self) -> Vec<u128> {
+        let balance_arr: Vec<u128> = self.outcome_tokens.iter().map(|(outcome, token)| {
+            token.get_balance(&env::current_account_id())
+        }).collect();
+
+        balance_arr
+    }
+
+    pub fn seed_pool(
         &mut self,
         sender: &AccountId,
-        total_in: u128,
-        denorm_weights: Vec<U128>
+        total_in: u128, 
+        weight_indication: Vec<u128>
     ) {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert!(!self.finalized, "ERR_POOL_FINALIZED");
-        assert!(denorm_weights.len() as u16 == self.num_of_outcomes, "ERR_INVALID_WEIGHTS");
+        assert!(weight_indication.len() as u16 == self.num_of_outcomes, "ERR_INVALID_WEIGHTS");
+        let mut outcome_tokens_to_return: Vec<u128> = vec![];
+        let max_weight = weight_indication.iter().max().unwrap();
 
-        let mut total = 0;
-        let total_tokens = denorm_weights.len() as u128 * total_in;
-        let mut i = 0;
-        for weight in denorm_weights {
-            let weight_u128 = u128::from(weight);
-            let token_balance = math::mul_u128(total_tokens, weight_u128);
-            self.outcome_balances.insert(&(i as u16), &token_balance);
-            total += weight_u128;
-            i += 1;
+        for (i, weight) in weight_indication.iter().enumerate() {
+            let remaining = math::div_u128(math::mul_u128(total_in, *weight), *max_weight);
+            outcome_tokens_to_return.insert(i, total_in - remaining);
         }
-        
-        assert_eq!(total, constants::TOKEN_DENOM, "ERR_WEIGHT_SUM_INVALID");
+        self.mint_and_transfer_outcome_tokens(
+            sender, 
+            total_in, 
+            outcome_tokens_to_return
+        );
 
-        self.outcome_tokens_sum = total_tokens;
-        self.collateral = total_in;
+        // Send collateral in and calculate if collateral should be returned
+        if self.pool_token.total_supply() > 0 {
+            self.pool_token.burn_internal(self.pool_token.total_supply(), &env::predecessor_account_id());
+        } 
+
+        self.pool_token.mint_internal(total_in, sender);
+    }
+
+    pub fn join_pool(
+        &mut self,
+        sender: &AccountId,
+        total_in: u128
+    ) {
+        assert!(self.finalized, "ERR_POOL_NOT_FINALIZED");
+        let mut outcome_tokens_to_return: Vec<u128> = vec![];
+        let pool_balances = self.get_pool_balances();
+        let max_weight = pool_balances.iter().max().unwrap();
+        let pool_supply = self.pool_token.total_supply();
+
+        for (i, balance) in pool_balances.iter().enumerate() {
+            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_weight);
+            outcome_tokens_to_return.insert(i, total_in - remaining);
+        }
+
+        self.mint_and_transfer_outcome_tokens(
+            sender, 
+            total_in, 
+            outcome_tokens_to_return
+        );
+
+        let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_weight);
+        self.pool_token.mint_internal(to_mint, sender);
+    }
+
+    fn mint_and_transfer_outcome_tokens(
+        &mut self,
+        sender: &AccountId,
+        total_in: u128,
+        outcome_tokens_to_return: Vec<u128>
+    ) {
+        for (outcome, amount) in outcome_tokens_to_return.iter().enumerate() {
+            let mut outcome_token = self.outcome_tokens
+            .get(&(outcome as u16))
+            .unwrap_or_else(|| { MintableFungibleTokenVault::new(self.id, outcome as u16, 0) });
+            
+            outcome_token.mint_internal(total_in,& env::current_account_id());
+
+            if *amount > 0 { 
+                outcome_token.safe_transfer_from_internal(&env::current_account_id(), sender, *amount);
+            }
+
+            self.outcome_tokens.insert(&(outcome as u16), &outcome_token);
+        }
     }
 
     pub fn finalize(
@@ -86,11 +158,12 @@ impl Pool {
         sender: &AccountId
     ) {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
+        assert_eq!(self.outcome_tokens.len() as u16, self.num_of_outcomes, "ERR_NOT_BINDED");
         self.finalized = true;
-        // Set owners pool tokens to default
-        // Transfer self.collateral from owner to this contract
+        println!("finalizing: {}", self.finalized);
     }
 
+    // Should be done in data layer
     pub fn get_spot_price(
         &self,
         target_outcome: u16
@@ -100,7 +173,7 @@ impl Pool {
         let mut odds_weight_for_target = zero;
         let mut odds_weight_sum = zero;
 
-        for (outcome, _) in self.outcome_balances.iter() {
+        for (outcome, _) in self.outcome_tokens.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
             odds_weight_sum += weight_for_outcome;
 
@@ -109,13 +182,13 @@ impl Pool {
             }
         } 
 
-        // TODO Mul by 1 - fee
         let ratio = math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum);
         let scale = math::div_u128(constants::TOKEN_DENOM, constants::TOKEN_DENOM - self.swap_fee);
 
         math::mul_u128(ratio, scale)
     }
 
+    // Should be done in data layer
     pub fn get_spot_price_sans_fee(
         &self,
         target_outcome: u16
@@ -125,14 +198,15 @@ impl Pool {
         let mut odds_weight_for_target = zero;
         let mut odds_weight_sum = zero;
 
-        for (outcome, _) in self.outcome_balances.iter() {
+        for (outcome, _) in self.outcome_tokens.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
-            odds_weight_sum += weight_for_outcome;
 
+            odds_weight_sum += weight_for_outcome;
+            
             if outcome == target_outcome {
                 odds_weight_for_target = weight_for_outcome;
             }
-        } 
+        }
 
         math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum) 
     }
@@ -144,19 +218,103 @@ impl Pool {
         let zero = u256::from(0);
         let mut odds_weight_for_target: u256 = zero;
 
-        for (outcome, balance) in self.outcome_balances.iter() {
+        for (outcome, token) in self.outcome_tokens.iter() {
             if outcome != target_outcome {
-                odds_weight_for_target = match odds_weight_for_target {
-                    zero => u256::from(balance),
-                    _ => math::mul_u256(odds_weight_for_target, u256::from(balance))
+                let balance = token.get_balance(&env::current_account_id());
+                odds_weight_for_target = if odds_weight_for_target == zero {
+                    u256::from(balance)
+                } else {
+                    odds_weight_for_target * u256::from(balance)
                 };
             }
         }
-
         odds_weight_for_target
     }
 
+    pub fn calc_buy_amount(
+        &self, 
+        collateral_in: u128, 
+        outcome_target: u16
+    ) -> u128 {
+        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+        
+        let outcome_tokens = &self.outcome_tokens;
+        let collateral_in_minus_fees = collateral_in - math::mul_u128(collateral_in, self.swap_fee);
+        let token_to_buy = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
+        let token_to_buy_balance = token_to_buy.get_balance(&env::current_account_id());
+        let mut new_buy_token_balance = token_to_buy_balance;
 
+        for (outcome, token) in outcome_tokens.iter() {
+            if outcome != outcome_target {
+                let balance = token.get_balance(&env::current_account_id());
+                let dividend = math::mul_u128(new_buy_token_balance, balance);
+                let divisor = balance + collateral_in_minus_fees;
 
+                new_buy_token_balance = math::div_u128(dividend, divisor);
+            }
+        }
+        assert!(new_buy_token_balance > 0, "ERR_MATH_APPROX");
 
+        token_to_buy_balance + collateral_in_minus_fees - new_buy_token_balance
+    }
+
+    pub fn calc_sell_collateral_out(
+        &self, 
+        collateral_out: u128, 
+        outcome_target: u16
+    ) -> u128 {
+        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+        
+        let outcome_tokens = &self.outcome_tokens;
+        let collateral_out_plus_fees = math::div_u128(collateral_out, constants::TOKEN_DENOM - self.swap_fee);
+        let token_to_sell = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
+        let token_to_sell_balance = token_to_sell.get_balance(&env::current_account_id());
+        let mut new_sell_token_balance = token_to_sell_balance;
+
+        for (outcome, token) in outcome_tokens.iter() {
+            if outcome != outcome_target {
+                let balance = token.get_balance(&env::current_account_id());
+                let dividend = math::mul_u128(new_sell_token_balance, balance);
+                let divisor = balance - collateral_out_plus_fees;
+
+                new_sell_token_balance = math::div_u128(dividend, divisor);
+            }
+        }
+        assert!(new_sell_token_balance > 0, "ERR_MATH_APPROX");
+
+        collateral_out_plus_fees + new_sell_token_balance - token_to_sell_balance
+    }
+
+    pub fn buy(
+        &mut self,
+        collateral_in: u128,
+        outcome_target: u16,
+        max_collateral_in: u128
+    ) {
+        let outcome_tokens = self.calc_buy_amount(collateral_in, outcome_target);
+        assert!(max_collateral_in <= collateral_in, "ERR_MIN_BUY_AMOUNT");
+
+        // Transfer collateral in
+
+        let fee = math::mul_u128(collateral_in, self.swap_fee);
+        self.fee_pool += fee;
+
+        let tokens_to_mint = collateral_in - fee;
+        self.add_to_pools(tokens_to_mint);
+
+        // Transfer outcome_token to user
+
+        // Log
+    }
+
+    // TODO: Make this mint while iterating through it's own tokens functions
+    fn add_to_pools(&mut self, amount: u128) {
+
+        for outcome in 0..self.num_of_outcomes {
+            let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
+            token.mint_internal(amount, &env::current_account_id());
+            self.outcome_tokens.insert(&outcome, &token);
+        }
+    }
+    
 }
