@@ -54,9 +54,9 @@ impl PoolFactory {
         }
     }
 
-    pub fn get_outcome_balance(&self, pool_id: U64, outcome: u16) -> U128 {
+    pub fn get_outcome_balance(&self, account_id: &AccountId, pool_id: U64, outcome: u16) -> U128 {
         let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
-        U128(pool.get_balance(outcome))
+        U128(pool.get_balance(account_id, outcome))
     }
 
     pub fn get_pool_token_balance(&self, pool_id: U64, owner_id: &AccountId) -> U128 {
@@ -173,7 +173,12 @@ impl PoolFactory {
         max_collateral_in: U128
     ) {
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
-        pool.buy(collateral_in.into(), outcome_target, max_collateral_in.into());
+        pool.buy(
+            &env::predecessor_account_id(),
+            collateral_in.into(), 
+            outcome_target, 
+            max_collateral_in.into()
+        );
         self.pools.insert(&pool_id.into(), &pool);
     }
 

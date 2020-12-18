@@ -57,11 +57,11 @@ impl Pool {
         self.swap_fee
     }
 
-    pub fn get_balance(&self, outcome: u16) -> u128 {
+    pub fn get_balance(&self, account_id: &AccountId, outcome: u16) -> u128 {
         self.outcome_tokens
             .get(&outcome)
             .expect("ERR_NO_OUTCOME")
-            .get_balance(&env::current_account_id())
+            .get_balance(account_id)
     }
 
     pub fn get_pool_token_balance(&self, owner_id: &AccountId) -> u128 {
@@ -287,22 +287,28 @@ impl Pool {
 
     pub fn buy(
         &mut self,
-        collateral_in: u128,
+        sender: &AccountId,
+        amount_in: u128,
         outcome_target: u16,
-        max_collateral_in: u128
+        min_shares_out: u128
     ) {
-        let outcome_tokens = self.calc_buy_amount(collateral_in, outcome_target);
-        assert!(max_collateral_in <= collateral_in, "ERR_MIN_BUY_AMOUNT");
+        assert!(self.finalized, "ERR_NOT_FINALIZED");
+        assert!(outcome_target < self.num_of_outcomes, "ERR_OUTCOME_INVALID");
+
+        let shares_out = self.calc_buy_amount(amount_in, outcome_target);
+        assert!(shares_out >= min_shares_out, "ERR_MIN_BUY_AMOUNT");
 
         // Transfer collateral in
 
-        let fee = math::mul_u128(collateral_in, self.swap_fee);
+        let fee = math::mul_u128(amount_in, self.swap_fee);
         self.fee_pool += fee;
 
-        let tokens_to_mint = collateral_in - fee;
+        let tokens_to_mint = amount_in - fee;
         self.add_to_pools(tokens_to_mint);
 
-        // Transfer outcome_token to user
+        let mut token_out = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
+        token_out.safe_transfer_from_internal(&env::current_account_id(), sender, shares_out);
+        self.outcome_tokens.insert(&outcome_target, &token_out);
 
         // Log
     }

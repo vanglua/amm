@@ -11,6 +11,10 @@ use near_sdk::{
 
 use crate::pool_factory::PoolFactory;
 
+fn contract_id() -> String {
+    "contract".to_string()
+}
+
 fn alice() -> String {
     "alice".to_string()
 }
