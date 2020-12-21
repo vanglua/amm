@@ -127,6 +127,14 @@ impl PoolFactory {
         self.pools.insert(&pool_id.into(), &pool);
     }
 
+    pub fn get_pool_balances(
+        &self,
+        pool_id: U64
+    ) -> Vec<U128>{
+        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        pool.get_pool_balances().iter().map(|b| { U128(*b) }).collect()
+    }
+
     pub fn get_spot_price(
         &self, 
         pool_id: U64, 
@@ -162,7 +170,7 @@ impl PoolFactory {
         outcome_target: u16
     ) -> U128 {
         let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
-        U128(pool.calc_sell_collateral_out(collateral_out.into(), outcome_target))
+        U128(pool.calc_sell_tokens_in(collateral_out.into(), outcome_target))
     }
 
     pub fn buy(
@@ -170,14 +178,31 @@ impl PoolFactory {
         pool_id: U64, 
         collateral_in: U128, 
         outcome_target: u16,
-        max_collateral_in: U128
+        min_shares_out: U128
     ) {
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         pool.buy(
             &env::predecessor_account_id(),
             collateral_in.into(), 
             outcome_target, 
-            max_collateral_in.into()
+            min_shares_out.into()
+        );
+        self.pools.insert(&pool_id.into(), &pool);
+    }
+
+    pub fn sell(
+        &mut self, 
+        pool_id: U64, 
+        collateral_out: U128, 
+        outcome_target: u16,
+        max_shares_in: U128
+    ) {
+        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        pool.sell(
+            &env::predecessor_account_id(),
+            collateral_out.into(), 
+            outcome_target, 
+            max_shares_in.into()
         );
         self.pools.insert(&pool_id.into(), &pool);
     }

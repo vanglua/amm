@@ -160,8 +160,139 @@ impl Pool {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert_eq!(self.outcome_tokens.len() as u16, self.num_of_outcomes, "ERR_NOT_BINDED");
         self.finalized = true;
-        println!("finalizing: {}", self.finalized);
     }
+
+
+    pub fn calc_buy_amount(
+        &self, 
+        collateral_in: u128, 
+        outcome_target: u16
+    ) -> u128 {
+        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+        
+        let outcome_tokens = &self.outcome_tokens;
+        let collateral_in_minus_fees = collateral_in - math::mul_u128(collateral_in, self.swap_fee);
+        let token_to_buy = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
+        let token_to_buy_balance = token_to_buy.get_balance(&env::current_account_id());
+        let mut new_buy_token_balance = token_to_buy_balance;
+
+        for (outcome, token) in outcome_tokens.iter() {
+            if outcome != outcome_target {
+                let balance = token.get_balance(&env::current_account_id());
+                let dividend = math::mul_u128(new_buy_token_balance, balance);
+                let divisor = balance + collateral_in_minus_fees;
+
+                new_buy_token_balance = math::div_u128(dividend, divisor);
+            }
+        }
+        assert!(new_buy_token_balance > 0, "ERR_MATH_APPROX");
+
+        token_to_buy_balance + collateral_in_minus_fees - new_buy_token_balance
+    }
+
+    pub fn calc_sell_tokens_in(
+        &self, 
+        collateral_out: u128, 
+        outcome_target: u16
+    ) -> u128 {
+        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+        
+        let outcome_tokens = &self.outcome_tokens;
+        let collateral_out_plus_fees = math::div_u128(collateral_out, constants::TOKEN_DENOM - self.swap_fee);
+        let token_to_sell = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
+        let token_to_sell_balance = token_to_sell.get_balance(&env::current_account_id());
+        let mut new_sell_token_balance = token_to_sell_balance;
+
+        for (outcome, token) in outcome_tokens.iter() {
+            if outcome != outcome_target {
+                let balance = token.get_balance(&env::current_account_id());
+                let dividend = math::mul_u128(new_sell_token_balance, balance);
+                let divisor = balance - collateral_out_plus_fees;
+
+                new_sell_token_balance = math::div_u128(dividend, divisor);
+            }
+        }
+        assert!(new_sell_token_balance > 0, "ERR_MATH_APPROX");
+
+        collateral_out_plus_fees + new_sell_token_balance - token_to_sell_balance
+    }
+
+    pub fn buy(
+        &mut self,
+        sender: &AccountId,
+        amount_in: u128,
+        outcome_target: u16,
+        min_shares_out: u128
+    ) {
+        assert!(self.finalized, "ERR_NOT_FINALIZED");
+        assert!(outcome_target < self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+
+        let shares_out = self.calc_buy_amount(amount_in, outcome_target);
+        assert!(shares_out >= min_shares_out, "ERR_MIN_BUY_AMOUNT");
+
+        // Transfer collateral in
+
+        let fee = math::mul_u128(amount_in, self.swap_fee);
+        self.fee_pool += fee;
+
+        let tokens_to_mint = amount_in - fee;
+        self.add_to_pools(tokens_to_mint);
+
+        let mut token_out = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
+        token_out.safe_transfer_from_internal(&env::current_account_id(), sender, shares_out);
+        self.outcome_tokens.insert(&outcome_target, &token_out);
+
+        // Log
+    }
+
+    pub fn sell(
+        &mut self,
+        sender: &AccountId,
+        amount_out: u128,
+        outcome_target: u16,
+        max_shares_in: u128
+    ) {
+        assert!(self.finalized, "ERR_NOT_FINALIZED");
+        assert!(outcome_target < self.num_of_outcomes, "ERR_INVALID_OUTCOME");
+
+        let shares_in = self.calc_sell_tokens_in(amount_out, outcome_target);
+        assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
+
+        let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
+        token_in.transfer_no_vault(&env::current_account_id(), shares_in);
+        self.outcome_tokens.insert(&outcome_target, &token_in);
+
+        let fee = math::mul_u128(amount_out, self.swap_fee);
+        self.fee_pool += fee;
+
+        let tokens_to_burn = amount_out + fee;
+        self.remove_from_pools(tokens_to_burn);
+
+        // Transfer collateral out
+
+        // Log
+    }
+
+    fn add_to_pools(&mut self, amount: u128) {
+
+        for outcome in 0..self.num_of_outcomes {
+            let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
+            token.mint_internal(amount, &env::current_account_id());
+            self.outcome_tokens.insert(&outcome, &token);
+        }
+    }
+
+    fn remove_from_pools(&mut self, amount: u128) {
+        for outcome in 0..self.num_of_outcomes {
+            let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
+            token.burn_internal(amount, &env::current_account_id());
+            self.outcome_tokens.insert(&outcome, &token);
+        }
+    }
+
+    /**
+     * Test methods
+    */
 
     // Should be done in data layer
     pub fn get_spot_price(
@@ -187,7 +318,7 @@ impl Pool {
 
         math::mul_u128(ratio, scale)
     }
-
+    
     // Should be done in data layer
     pub fn get_spot_price_sans_fee(
         &self,
@@ -230,97 +361,4 @@ impl Pool {
         }
         odds_weight_for_target
     }
-
-    pub fn calc_buy_amount(
-        &self, 
-        collateral_in: u128, 
-        outcome_target: u16
-    ) -> u128 {
-        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
-        
-        let outcome_tokens = &self.outcome_tokens;
-        let collateral_in_minus_fees = collateral_in - math::mul_u128(collateral_in, self.swap_fee);
-        let token_to_buy = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
-        let token_to_buy_balance = token_to_buy.get_balance(&env::current_account_id());
-        let mut new_buy_token_balance = token_to_buy_balance;
-
-        for (outcome, token) in outcome_tokens.iter() {
-            if outcome != outcome_target {
-                let balance = token.get_balance(&env::current_account_id());
-                let dividend = math::mul_u128(new_buy_token_balance, balance);
-                let divisor = balance + collateral_in_minus_fees;
-
-                new_buy_token_balance = math::div_u128(dividend, divisor);
-            }
-        }
-        assert!(new_buy_token_balance > 0, "ERR_MATH_APPROX");
-
-        token_to_buy_balance + collateral_in_minus_fees - new_buy_token_balance
-    }
-
-    pub fn calc_sell_collateral_out(
-        &self, 
-        collateral_out: u128, 
-        outcome_target: u16
-    ) -> u128 {
-        assert!(outcome_target <= self.num_of_outcomes, "ERR_INVALID_OUTCOME");
-        
-        let outcome_tokens = &self.outcome_tokens;
-        let collateral_out_plus_fees = math::div_u128(collateral_out, constants::TOKEN_DENOM - self.swap_fee);
-        let token_to_sell = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
-        let token_to_sell_balance = token_to_sell.get_balance(&env::current_account_id());
-        let mut new_sell_token_balance = token_to_sell_balance;
-
-        for (outcome, token) in outcome_tokens.iter() {
-            if outcome != outcome_target {
-                let balance = token.get_balance(&env::current_account_id());
-                let dividend = math::mul_u128(new_sell_token_balance, balance);
-                let divisor = balance - collateral_out_plus_fees;
-
-                new_sell_token_balance = math::div_u128(dividend, divisor);
-            }
-        }
-        assert!(new_sell_token_balance > 0, "ERR_MATH_APPROX");
-
-        collateral_out_plus_fees + new_sell_token_balance - token_to_sell_balance
-    }
-
-    pub fn buy(
-        &mut self,
-        sender: &AccountId,
-        amount_in: u128,
-        outcome_target: u16,
-        min_shares_out: u128
-    ) {
-        assert!(self.finalized, "ERR_NOT_FINALIZED");
-        assert!(outcome_target < self.num_of_outcomes, "ERR_OUTCOME_INVALID");
-
-        let shares_out = self.calc_buy_amount(amount_in, outcome_target);
-        assert!(shares_out >= min_shares_out, "ERR_MIN_BUY_AMOUNT");
-
-        // Transfer collateral in
-
-        let fee = math::mul_u128(amount_in, self.swap_fee);
-        self.fee_pool += fee;
-
-        let tokens_to_mint = amount_in - fee;
-        self.add_to_pools(tokens_to_mint);
-
-        let mut token_out = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
-        token_out.safe_transfer_from_internal(&env::current_account_id(), sender, shares_out);
-        self.outcome_tokens.insert(&outcome_target, &token_out);
-
-        // Log
-    }
-
-    // TODO: Make this mint while iterating through it's own tokens functions
-    fn add_to_pools(&mut self, amount: u128) {
-
-        for outcome in 0..self.num_of_outcomes {
-            let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
-            token.mint_internal(amount, &env::current_account_id());
-            self.outcome_tokens.insert(&outcome, &token);
-        }
-    }
-    
 }
