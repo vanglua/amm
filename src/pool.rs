@@ -84,7 +84,7 @@ impl Pool {
         &mut self,
         sender: &AccountId,
         total_in: u128, 
-        weight_indication: Vec<u128>
+        weight_indication: &Vec<u128>
     ) {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert!(!self.finalized, "ERR_POOL_FINALIZED");
@@ -107,7 +107,7 @@ impl Pool {
         self.mint_and_transfer_outcome_tokens(
             sender, 
             total_in, 
-            outcome_tokens_to_return
+            &outcome_tokens_to_return
         );
         
         self.mint_internal(sender, total_in);
@@ -133,7 +133,7 @@ impl Pool {
         self.mint_and_transfer_outcome_tokens(
             sender, 
             total_in, 
-            outcome_tokens_to_return
+            &outcome_tokens_to_return
         );
 
         let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance);
@@ -146,7 +146,6 @@ impl Pool {
         total_in: u128
     ) {
         let balances = self.get_pool_balances();
-
         let pool_token_supply = self.pool_token.total_supply();
 
         for (i, balance) in balances.iter().enumerate() {
@@ -164,7 +163,7 @@ impl Pool {
         &mut self,
         sender: &AccountId,
         total_in: u128,
-        outcome_tokens_to_return: Vec<u128>
+        outcome_tokens_to_return: &Vec<u128>
     ) {
         for (outcome, amount) in outcome_tokens_to_return.iter().enumerate() {
             let mut outcome_token = self.outcome_tokens
@@ -219,8 +218,6 @@ impl Pool {
         // On transfer or burn
         if let Some(account_id) = from {
             let withdrawn_fees = self.withdrawn_fees.get(account_id).expect("ERR_NO_BAL");
-            println!("burn withdrawn_fees {} ",withdrawn_fees);
-            println!("burn inel amount {} ", ineligible_fee_amount);
             self.withdrawn_fees.insert(account_id, &(withdrawn_fees - ineligible_fee_amount));
             self.total_withdrawn_fees -= ineligible_fee_amount;
         } else { // On mint
@@ -230,8 +227,6 @@ impl Pool {
         // On transfer or mint
         if let Some(account_id) = to { 
             let withdrawn_fees = self.withdrawn_fees.get(account_id).unwrap_or(0);
-            println!("mint withdrawn_fees {} ",withdrawn_fees);
-            println!("mint inel amount {} ", ineligible_fee_amount);
             self.withdrawn_fees.insert(account_id, &(withdrawn_fees + ineligible_fee_amount));
             self.total_withdrawn_fees += ineligible_fee_amount;
         } else { // On burn

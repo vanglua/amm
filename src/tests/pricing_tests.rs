@@ -44,7 +44,7 @@ fn multi_outcome_pool_pricing_test() {
     contract.seed_pool(pool_id, U128(to_token_denom(100)), vec![U128(third), U128(third), U128(third + 1)]);
     
     let even_price: u128 = contract.get_spot_price_sans_fee(pool_id, 1).into();
-    assert_eq!(even_price, 333333333333333334);
+    assert_eq!(even_price, 333_333_333_333_333_334);
     
     // Uneven pool
     let twenty = to_token_denom(2) / 10;
@@ -69,11 +69,11 @@ fn multi_outcome_pool_pricing_test() {
     let price_1: u128 = contract.get_spot_price_sans_fee(pool_id, 1).into();
     let price_2: u128 = contract.get_spot_price_sans_fee(pool_id, 2).into();
 
-    assert!(u128::from(to_token_denom(1)) - (price_0 + price_1 + price_2) < 100000);
+    assert!(to_token_denom(1) - (price_0 + price_1 + price_2) < 100_000);
 
-    assert_eq!(expected_mp_0, 428571428571428571);
-    assert_eq!(expected_mp_1, 428571428571428571);
-    assert_eq!(expected_mp_2, 142857142857142857);
+    assert_eq!(expected_mp_0, 428_571_428_571_428_571);
+    assert_eq!(expected_mp_1, 428_571_428_571_428_571);
+    assert_eq!(expected_mp_2, 142_857_142_857_142_857);
 }
 
 #[test]

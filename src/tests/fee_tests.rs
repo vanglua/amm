@@ -20,7 +20,7 @@ fn lp_fee_test() {
     let seed_amount = to_token_denom(1000);
     
     // SEED
-    contract.seed_pool(pool_id, U128(seed_amount), wrap_u128_vec(weights));
+    contract.seed_pool(pool_id, U128(seed_amount), wrap_u128_vec(&weights));
     
     let creator_pool_token_balance: u128 = contract.get_pool_token_balance(pool_id, &alice()).into();
     

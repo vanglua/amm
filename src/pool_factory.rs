@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 use near_sdk::{
     near_bindgen,
     json_types::{
@@ -103,7 +105,7 @@ impl PoolFactory {
         pool.seed_pool(
             &env::predecessor_account_id(), 
             total_in.into(), 
-            weights_u128
+            &weights_u128
         );
         
         self.pools.insert(&pool_id.into(), &pool);

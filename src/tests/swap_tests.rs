@@ -29,7 +29,7 @@ fn calc_sell_collateral_out_test() {
     contract.seed_pool(pool_id, U128(to_token_denom(10)), vec![U128(half), U128(half)]);
     
     let amt: u128 = contract.calc_sell_collateral_out(pool_id, U128(to_token_denom(1)), 0).into();
-    let expected_amt = 2111111111111111111;
+    let expected_amt = 2_111_111_111_111_111_111;
 
     assert_eq!(amt, expected_amt);
 }
@@ -133,7 +133,7 @@ fn complex_buy_test() {
     let buy_amount = to_token_denom(1);
 
     contract.seed_pool(pool_id, U128(seed_amt), vec![U128(weights[0]), U128(weights[1]), U128(weights[2])]);
-    let init_balances = unwrap_u128_vec(contract.get_pool_balances(pool_id));
+    let init_balances = unwrap_u128_vec(&contract.get_pool_balances(pool_id));
     let init_invariant = product_of(&init_balances);
 
     contract.finalize_pool(pool_id);
@@ -144,7 +144,7 @@ fn complex_buy_test() {
     
     contract.buy(pool_id, U128(buy_amount), 0, U128(to_token_denom(8) / 10));
     
-    let post_trade_balances = unwrap_u128_vec(contract.get_pool_balances(pool_id));
+    let post_trade_balances = unwrap_u128_vec(&contract.get_pool_balances(pool_id));
     
     let post_trade_invariant = product_of(&init_balances);
     assert_eq!(init_invariant, post_trade_invariant);

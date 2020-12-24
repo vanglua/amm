@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 use near_sdk::{
     serde_json,
     json_types::{
@@ -37,7 +39,7 @@ const GAS_FOR_REMAINING_COMPUTE: Gas = 2 * GAS_FOR_PROMISE + GAS_FOR_DATA_DEPEND
 pub struct VaultId(pub u64);
 
 impl VaultId {
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
 }
