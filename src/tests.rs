@@ -93,11 +93,11 @@ fn calc_weights_from_price(prices: Vec<u128>) -> Vec<u128> {
     }).collect()
 }
 
-fn unwrap_U128(vec_in: Vec<U128>) -> Vec<u128> {
+fn unwrap_u128_vec(vec_in: Vec<U128>) -> Vec<u128> {
     vec_in.iter().map(|n| { u128::from(*n) }).collect()
 }
 
-fn wrap_u128(vec_in: Vec<u128>) -> Vec<U128> {
+fn wrap_u128_vec(vec_in: Vec<u128>) -> Vec<U128> {
     vec_in.iter().map(|n| { U128(*n) }).collect()
 }
 

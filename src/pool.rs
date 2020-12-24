@@ -14,7 +14,7 @@ use near_sdk::{
 
 use crate::math;
 use crate::constants;
-use crate::logger;
+
 use crate::vault_token::MintableFungibleTokenVault;
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -146,7 +146,6 @@ impl Pool {
         total_in: u128
     ) {
         let balances = self.get_pool_balances();
-        let mut send_out_amounts: Vec<u128> = vec![];
 
         let pool_token_supply = self.pool_token.total_supply();
 
@@ -206,8 +205,9 @@ impl Pool {
         to: Option<&AccountId>,
         amount: u128
     ) {
-        if from.is_some() {
-            self.withdraw_fees(from.unwrap());
+
+        if let Some(account_id) = from {
+            self.withdraw_fees(account_id);
         }
 
         let total_supply = self.pool_token.total_supply();
@@ -217,22 +217,22 @@ impl Pool {
         };
 
         // On transfer or burn
-        if let Some(val) = from {
-            let withdrawn_fees = self.withdrawn_fees.get(val).expect("ERR_NO_BAL");
+        if let Some(account_id) = from {
+            let withdrawn_fees = self.withdrawn_fees.get(account_id).expect("ERR_NO_BAL");
             println!("burn withdrawn_fees {} ",withdrawn_fees);
             println!("burn inel amount {} ", ineligible_fee_amount);
-            self.withdrawn_fees.insert(val, &(withdrawn_fees - ineligible_fee_amount));
+            self.withdrawn_fees.insert(account_id, &(withdrawn_fees - ineligible_fee_amount));
             self.total_withdrawn_fees -= ineligible_fee_amount;
         } else { // On mint
             self.fee_pool_weight += ineligible_fee_amount;
         }
 
         // On transfer or mint
-        if let Some(val) = to { 
-            let withdrawn_fees = self.withdrawn_fees.get(val).unwrap_or(0);
+        if let Some(account_id) = to { 
+            let withdrawn_fees = self.withdrawn_fees.get(account_id).unwrap_or(0);
             println!("mint withdrawn_fees {} ",withdrawn_fees);
             println!("mint inel amount {} ", ineligible_fee_amount);
-            self.withdrawn_fees.insert(val, &(withdrawn_fees + ineligible_fee_amount));
+            self.withdrawn_fees.insert(account_id, &(withdrawn_fees + ineligible_fee_amount));
             self.total_withdrawn_fees += ineligible_fee_amount;
         } else { // On burn
             self.fee_pool_weight -= ineligible_fee_amount;

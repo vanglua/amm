@@ -133,7 +133,7 @@ fn complex_buy_test() {
     let buy_amount = to_token_denom(1);
 
     contract.seed_pool(pool_id, U128(seed_amt), vec![U128(weights[0]), U128(weights[1]), U128(weights[2])]);
-    let init_balances = unwrap_U128(contract.get_pool_balances(pool_id));
+    let init_balances = unwrap_u128_vec(contract.get_pool_balances(pool_id));
     let init_invariant = product_of(&init_balances);
 
     contract.finalize_pool(pool_id);
@@ -144,7 +144,7 @@ fn complex_buy_test() {
     
     contract.buy(pool_id, U128(buy_amount), 0, U128(to_token_denom(8) / 10));
     
-    let post_trade_balances = unwrap_U128(contract.get_pool_balances(pool_id));
+    let post_trade_balances = unwrap_u128_vec(contract.get_pool_balances(pool_id));
     
     let post_trade_invariant = product_of(&init_balances);
     assert_eq!(init_invariant, post_trade_invariant);
