@@ -54,9 +54,9 @@ impl PoolFactory {
         }
     }
 
-    pub fn get_outcome_balance(&self, account_id: &AccountId, pool_id: U64, outcome: u16) -> U128 {
+    pub fn get_share_balance(&self, account_id: &AccountId, pool_id: U64, outcome: u16) -> U128 {
         let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
-        U128(pool.get_balance(account_id, outcome))
+        U128(pool.get_share_balance(account_id, outcome))
     }
 
     pub fn get_pool_token_balance(&self, pool_id: U64, owner_id: &AccountId) -> U128 {
@@ -67,6 +67,11 @@ impl PoolFactory {
     pub fn get_pool_swap_fee(&self, pool_id: U64) -> U128 {
         let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         U128(pool.get_swap_fee())
+    }
+
+    pub fn get_fees_withdrawable(&self, pool_id: U64, account_id: &AccountId) -> U128 {
+        let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        U128(pool.get_fees_withdrawable(account_id))
     }
 
     pub fn new_pool(
@@ -118,6 +123,20 @@ impl PoolFactory {
         self.pools.insert(&pool_id.into(), &pool);
     }
 
+    pub fn exit_pool(
+        &mut self, 
+        pool_id: U64, 
+        total_in: U128, 
+    ) {
+        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        pool.exit_pool(
+            &env::predecessor_account_id(), 
+            total_in.into()
+        );
+        
+        self.pools.insert(&pool_id.into(), &pool);
+    }
+
     pub fn finalize_pool(
         &mut self,
         pool_id: U64
@@ -131,7 +150,7 @@ impl PoolFactory {
         &self,
         pool_id: U64
     ) -> Vec<U128>{
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         pool.get_pool_balances().iter().map(|b| { U128(*b) }).collect()
     }
 
@@ -199,7 +218,6 @@ impl PoolFactory {
     ) {
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         pool.sell(
-            &env::predecessor_account_id(),
             collateral_out.into(), 
             outcome_target, 
             max_shares_in.into()

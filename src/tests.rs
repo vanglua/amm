@@ -9,6 +9,8 @@ use near_sdk::{
     }
 };
 
+use crate::constants;
+use crate::math;
 use crate::pool_factory::PoolFactory;
 
 fn contract_id() -> String {
@@ -72,8 +74,36 @@ fn get_context(
     }
 }
 
+fn product_of(nums: &Vec<u128>) -> u128 {
+    assert!(nums.len() > 1, "ERR_INVALID_NUMS");
+    let mut product = constants::TOKEN_DENOM;
+
+    for price in nums.to_vec() {
+        product = math::mul_u128(product, price);
+    }
+    
+    product
+}
+
+fn calc_weights_from_price(prices: Vec<u128>) -> Vec<u128> {
+    let product = product_of(&prices);
+    
+    prices.iter().map(|price| {
+       math::div_u128(product, *price)
+    }).collect()
+}
+
+fn unwrap_U128(vec_in: Vec<U128>) -> Vec<u128> {
+    vec_in.iter().map(|n| { u128::from(*n) }).collect()
+}
+
+fn wrap_u128(vec_in: Vec<u128>) -> Vec<U128> {
+    vec_in.iter().map(|n| { U128(*n) }).collect()
+}
+
 mod init_tests;
 mod pool_initiation_tests;
 mod pricing_tests;
 mod swap_tests;
 mod liquidity_tests;
+mod fee_tests;

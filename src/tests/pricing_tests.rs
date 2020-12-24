@@ -15,14 +15,13 @@ fn pool_initial_pricing_test() {
     let even_price: u128 = contract.get_spot_price_sans_fee(pool_id, 0).into();
     assert_eq!(even_price, half);
 
-
     let forty = to_token_denom(4) / 10;
     let sixty = to_token_denom(6) / 10;
     
     contract.seed_pool(pool_id, U128(to_token_denom(100)), vec![U128(forty), U128(sixty)]);
 
-    let expected_0 = 545_454_545_454_545_455;
-    let expected_1 = 454_545_454_545_454_545;
+    let expected_0 = to_token_denom(6) / 10;
+    let expected_1 = to_token_denom(4) / 10;
 
     let price_0: u128 = contract.get_spot_price_sans_fee(pool_id, 0).into();
     let price_1: u128 = contract.get_spot_price_sans_fee(pool_id, 1).into();

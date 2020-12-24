@@ -72,8 +72,8 @@ pub struct MintableToken {
 }
 
 impl MintableToken {
-    pub fn new(pool_id: u64, outcome_id: u16, initial_supply: u128) -> Self {
-        let mut accounts: LookupMap<AccountId, Balance> = LookupMap::new(format!("balance:token:{}:{}", pool_id, outcome_id).as_bytes().to_vec()); 
+    pub fn new(pool_id: u64, outcome_id: u16, seed_nonce: u64, initial_supply: u128) -> Self {
+        let mut accounts: LookupMap<AccountId, Balance> = LookupMap::new(format!("balance:token:{}:{}:{}", pool_id, outcome_id, seed_nonce).as_bytes().to_vec()); 
         accounts.insert(&env::current_account_id(), &initial_supply);
 
         Self {
@@ -82,14 +82,14 @@ impl MintableToken {
         }
     }
 
-    pub fn mint_internal(&mut self, amount: u128, account_id: &AccountId) {
+    pub fn mint(&mut self, account_id: &AccountId, amount: u128) {
         self.total_supply += amount;
         let account_balance = self.accounts.get(account_id).unwrap_or(0);
         let new_balance = account_balance + amount;
         self.accounts.insert(account_id, &new_balance);
     }
 
-    pub fn burn_internal(&mut self, amount: u128, account_id: &AccountId) {
+    pub fn burn(&mut self, account_id: &AccountId, amount: u128) {
         let mut balance = self.accounts.get(&account_id).unwrap_or(0);
 
         assert!(balance >= amount, "ERR_LOW_BALANCE");
@@ -130,10 +130,10 @@ impl Default for MintableFungibleTokenVault {
 }
 
 impl MintableFungibleTokenVault {
-    pub fn new(pool_id: u64, outcome_id: u16, initial_supply: u128) -> Self {
+    pub fn new(pool_id: u64, outcome_id: u16, seed_nonce: u64 ,initial_supply: u128,) -> Self {
         Self {
-            token: MintableToken::new(pool_id, outcome_id, initial_supply),
-            vaults: LookupMap::new(format!("vault:token:{}:{}", pool_id, outcome_id).as_bytes().to_vec()),
+            token: MintableToken::new(pool_id, outcome_id, seed_nonce, initial_supply),
+            vaults: LookupMap::new(format!("vault:token:{}:{}:{}", pool_id, outcome_id, seed_nonce).as_bytes().to_vec()),
             next_vault_id: VaultId(0),
         }
     }
@@ -146,12 +146,12 @@ impl MintableFungibleTokenVault {
         self.token.total_supply
     }
 
-    pub fn mint_internal(&mut self, amount: u128, account_id: &AccountId) {
-        self.token.mint_internal(amount, account_id);
+    pub fn mint(&mut self, account_id: &AccountId, amount: u128) {
+        self.token.mint(account_id, amount);
     }
 
-    pub fn burn_internal(&mut self, amount: u128, account_id: &AccountId) {
-        self.token.burn_internal(amount, account_id);
+    pub fn burn(&mut self, account_id: &AccountId, amount: u128) {
+        self.token.burn(account_id, amount);
     }
 
     pub fn transfer_no_vault(&mut self, receiver_id: &AccountId, amount: u128) {

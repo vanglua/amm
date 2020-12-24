@@ -12,12 +12,19 @@ construct_uint! {
     /// 256-bit unsigned integer.
     pub struct u256(4);
 }
+
 #[macro_use]
-mod vault_token;
-mod pool;
+/** core */
 mod pool_factory;
-mod constants;
+mod pool;
+mod vault_token;
+
+/** utils */
 mod math;
+mod logger;
+
+mod constants;
+
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]

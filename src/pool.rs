@@ -1,9 +1,9 @@
 use near_sdk::{
     env,
-    json_types::{ U128 },
     AccountId,
     collections::{
-        UnorderedMap
+        UnorderedMap,
+        LookupMap
 	},
     borsh::{
         self,
@@ -14,18 +14,21 @@ use near_sdk::{
 
 use crate::math;
 use crate::constants;
-use crate::u256;
+use crate::logger;
 use crate::vault_token::MintableFungibleTokenVault;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Pool {
     id: u64,
+    seed_nonce: u64,
     owner: AccountId,
     outcome_tokens: UnorderedMap<u16, MintableFungibleTokenVault>,
     num_of_outcomes: u16,
     collateral: u128,
     swap_fee: u128,
-    fee_pool: u128,
+    withdrawn_fees: LookupMap<AccountId, u128>,
+    total_withdrawn_fees: u128,
+    fee_pool_weight: u128,
     finalized: bool,
     pool_token: MintableFungibleTokenVault,
 }
@@ -42,14 +45,17 @@ impl Pool {
 
         Self {
             id: pool_id,
+            seed_nonce: 1,
             owner: sender,
             outcome_tokens: UnorderedMap::new(format!("pool::{}", pool_id).as_bytes().to_vec()),
             finalized: false,
             num_of_outcomes,
             swap_fee,
-            fee_pool: 0,
+            withdrawn_fees: LookupMap::new(format!("pool::{}", pool_id).as_bytes().to_vec()),
+            total_withdrawn_fees: 0,
+            fee_pool_weight: 0,
             collateral: 0,
-            pool_token: MintableFungibleTokenVault::new(pool_id, num_of_outcomes, 0)
+            pool_token: MintableFungibleTokenVault::new(pool_id, num_of_outcomes, 0, 0)
         }
     }
 
@@ -57,7 +63,7 @@ impl Pool {
         self.swap_fee
     }
 
-    pub fn get_balance(&self, account_id: &AccountId, outcome: u16) -> u128 {
+    pub fn get_share_balance(&self, account_id: &AccountId, outcome: u16) -> u128 {
         self.outcome_tokens
             .get(&outcome)
             .expect("ERR_NO_OUTCOME")
@@ -69,11 +75,9 @@ impl Pool {
     }
 
     pub fn get_pool_balances(&self) -> Vec<u128> {
-        let balance_arr: Vec<u128> = self.outcome_tokens.iter().map(|(outcome, token)| {
+        self.outcome_tokens.iter().map(|(_outcome, token)| {
             token.get_balance(&env::current_account_id())
-        }).collect();
-
-        balance_arr
+        }).collect()
     }
 
     pub fn seed_pool(
@@ -85,6 +89,7 @@ impl Pool {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert!(!self.finalized, "ERR_POOL_FINALIZED");
         assert!(weight_indication.len() as u16 == self.num_of_outcomes, "ERR_INVALID_WEIGHTS");
+        
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
         let max_weight = weight_indication.iter().max().unwrap();
 
@@ -92,18 +97,21 @@ impl Pool {
             let remaining = math::div_u128(math::mul_u128(total_in, *weight), *max_weight);
             outcome_tokens_to_return.insert(i, total_in - remaining);
         }
+
+        // Send collateral in and calculate if collateral should be returned
+        if self.pool_token.total_supply() > 0 {
+            self.outcome_tokens.clear();
+            self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
+        } 
+
         self.mint_and_transfer_outcome_tokens(
             sender, 
             total_in, 
             outcome_tokens_to_return
         );
-
-        // Send collateral in and calculate if collateral should be returned
-        if self.pool_token.total_supply() > 0 {
-            self.pool_token.burn_internal(self.pool_token.total_supply(), &env::predecessor_account_id());
-        } 
-
-        self.pool_token.mint_internal(total_in, sender);
+        
+        self.mint_internal(sender, total_in);
+        self.seed_nonce += 1;
     }
 
     pub fn join_pool(
@@ -114,11 +122,11 @@ impl Pool {
         assert!(self.finalized, "ERR_POOL_NOT_FINALIZED");
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
         let pool_balances = self.get_pool_balances();
-        let max_weight = pool_balances.iter().max().unwrap();
+        let max_balance = pool_balances.iter().max().unwrap();
         let pool_supply = self.pool_token.total_supply();
 
         for (i, balance) in pool_balances.iter().enumerate() {
-            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_weight);
+            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_balance);
             outcome_tokens_to_return.insert(i, total_in - remaining);
         }
 
@@ -128,8 +136,29 @@ impl Pool {
             outcome_tokens_to_return
         );
 
-        let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_weight);
-        self.pool_token.mint_internal(to_mint, sender);
+        let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance);
+        self.mint_internal(sender, to_mint);
+    }
+
+    pub fn exit_pool(
+        &mut self,
+        sender: &AccountId,
+        total_in: u128
+    ) {
+        let balances = self.get_pool_balances();
+        let mut send_out_amounts: Vec<u128> = vec![];
+
+        let pool_token_supply = self.pool_token.total_supply();
+
+        for (i, balance) in balances.iter().enumerate() {
+            let outcome = i as u16;
+            let send_out = math::div_u128(math::mul_u128(*balance, total_in), pool_token_supply);
+            let mut token = self.outcome_tokens.get(&outcome).unwrap();
+            token.safe_transfer_from_internal(&env::current_account_id(), sender, send_out);
+            self.outcome_tokens.insert(&outcome, &token);
+        }
+
+        self.burn_internal(sender, total_in);
     }
 
     fn mint_and_transfer_outcome_tokens(
@@ -141,9 +170,9 @@ impl Pool {
         for (outcome, amount) in outcome_tokens_to_return.iter().enumerate() {
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleTokenVault::new(self.id, outcome as u16, 0) });
+            .unwrap_or_else(|| { MintableFungibleTokenVault::new(self.id, outcome as u16, self.seed_nonce, 0) });
             
-            outcome_token.mint_internal(total_in,& env::current_account_id());
+            outcome_token.mint(& env::current_account_id(), total_in);
 
             if *amount > 0 { 
                 outcome_token.safe_transfer_from_internal(&env::current_account_id(), sender, *amount);
@@ -153,6 +182,88 @@ impl Pool {
         }
     }
 
+    fn mint_internal(
+        &mut self,
+        to: &AccountId,
+        amount: u128
+    ) {
+        self.before_pool_token_transfer(None, Some(to), amount);
+        self.pool_token.mint(to, amount)
+    }
+
+    fn burn_internal(
+        &mut self,
+        from: &AccountId,
+        amount: u128
+    ) {
+        self.before_pool_token_transfer(Some(from), None, amount);
+        self.pool_token.burn(from, amount);
+    }
+
+    fn before_pool_token_transfer(
+        &mut self,
+        from: Option<&AccountId>,
+        to: Option<&AccountId>,
+        amount: u128
+    ) {
+        if from.is_some() {
+            self.withdraw_fees(from.unwrap());
+        }
+
+        let total_supply = self.pool_token.total_supply();
+        let ineligible_fee_amount = match total_supply {
+            0 => amount,
+            _ => math::div_u128(math::mul_u128(self.fee_pool_weight, amount), total_supply)
+        };
+
+        // On transfer or burn
+        if let Some(val) = from {
+            let withdrawn_fees = self.withdrawn_fees.get(val).expect("ERR_NO_BAL");
+            println!("burn withdrawn_fees {} ",withdrawn_fees);
+            println!("burn inel amount {} ", ineligible_fee_amount);
+            self.withdrawn_fees.insert(val, &(withdrawn_fees - ineligible_fee_amount));
+            self.total_withdrawn_fees -= ineligible_fee_amount;
+        } else { // On mint
+            self.fee_pool_weight += ineligible_fee_amount;
+        }
+
+        // On transfer or mint
+        if let Some(val) = to { 
+            let withdrawn_fees = self.withdrawn_fees.get(val).unwrap_or(0);
+            println!("mint withdrawn_fees {} ",withdrawn_fees);
+            println!("mint inel amount {} ", ineligible_fee_amount);
+            self.withdrawn_fees.insert(val, &(withdrawn_fees + ineligible_fee_amount));
+            self.total_withdrawn_fees += ineligible_fee_amount;
+        } else { // On burn
+            self.fee_pool_weight -= ineligible_fee_amount;
+        }
+
+    }
+
+    pub fn get_fees_withdrawable(&self, account_id: &AccountId) -> u128 {
+        let pool_token_bal = self.pool_token.get_balance(account_id);
+        let pool_token_total_supply = self.pool_token.total_supply();
+        let raw_amount = math::div_u128(math::mul_u128(self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
+        let ineligible_fee_amount = self.withdrawn_fees.get(account_id).unwrap_or(0);
+        raw_amount - ineligible_fee_amount
+    }
+
+    pub fn withdraw_fees(
+        &mut self,
+        account_id: &AccountId
+    )  {
+        let pool_token_bal = self.pool_token.get_balance(account_id);
+        let pool_token_total_supply = self.pool_token.total_supply();
+        let raw_amount = math::div_u128(math::mul_u128(self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
+        let withdrawn_fees = self.withdrawn_fees.get(account_id).unwrap_or(0);
+        let withdrawable_amount = raw_amount - withdrawn_fees;
+        if withdrawable_amount > 0 {
+            self.withdrawn_fees.insert(account_id, &raw_amount);
+            self.total_withdrawn_fees += withdrawable_amount;
+            // Transfer collat back to user
+        }
+    }  
+
     pub fn finalize(
         &mut self,
         sender: &AccountId
@@ -161,7 +272,6 @@ impl Pool {
         assert_eq!(self.outcome_tokens.len() as u16, self.num_of_outcomes, "ERR_NOT_BINDED");
         self.finalized = true;
     }
-
 
     pub fn calc_buy_amount(
         &self, 
@@ -233,7 +343,7 @@ impl Pool {
         // Transfer collateral in
 
         let fee = math::mul_u128(amount_in, self.swap_fee);
-        self.fee_pool += fee;
+        self.fee_pool_weight += fee;
 
         let tokens_to_mint = amount_in - fee;
         self.add_to_pools(tokens_to_mint);
@@ -247,7 +357,6 @@ impl Pool {
 
     pub fn sell(
         &mut self,
-        sender: &AccountId,
         amount_out: u128,
         outcome_target: u16,
         max_shares_in: u128
@@ -263,7 +372,7 @@ impl Pool {
         self.outcome_tokens.insert(&outcome_target, &token_in);
 
         let fee = math::mul_u128(amount_out, self.swap_fee);
-        self.fee_pool += fee;
+        self.fee_pool_weight += fee;
 
         let tokens_to_burn = amount_out + fee;
         self.remove_from_pools(tokens_to_burn);
@@ -274,10 +383,9 @@ impl Pool {
     }
 
     fn add_to_pools(&mut self, amount: u128) {
-
         for outcome in 0..self.num_of_outcomes {
             let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
-            token.mint_internal(amount, &env::current_account_id());
+            token.mint(&env::current_account_id(), amount);
             self.outcome_tokens.insert(&outcome, &token);
         }
     }
@@ -285,13 +393,13 @@ impl Pool {
     fn remove_from_pools(&mut self, amount: u128) {
         for outcome in 0..self.num_of_outcomes {
             let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
-            token.burn_internal(amount, &env::current_account_id());
+            token.burn(&env::current_account_id(), amount);
             self.outcome_tokens.insert(&outcome, &token);
         }
     }
 
     /**
-     * Test methods
+     * Test functions
     */
 
     // Should be done in data layer
@@ -299,10 +407,9 @@ impl Pool {
         &self,
         target_outcome: u16
     ) -> u128 {
-        let zero = u256::from(0);
 
-        let mut odds_weight_for_target = zero;
-        let mut odds_weight_sum = zero;
+        let mut odds_weight_for_target = 0;
+        let mut odds_weight_sum = 0;
 
         for (outcome, _) in self.outcome_tokens.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
@@ -313,7 +420,7 @@ impl Pool {
             }
         } 
 
-        let ratio = math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum);
+        let ratio = math::div_u128(odds_weight_for_target, odds_weight_sum);
         let scale = math::div_u128(constants::TOKEN_DENOM, constants::TOKEN_DENOM - self.swap_fee);
 
         math::mul_u128(ratio, scale)
@@ -324,11 +431,9 @@ impl Pool {
         &self,
         target_outcome: u16
     ) -> u128 {
-        let zero = u256::from(0);
-
-        let mut odds_weight_for_target = zero;
-        let mut odds_weight_sum = zero;
-
+        let mut odds_weight_for_target = 0;
+        let mut odds_weight_sum = 0;
+        
         for (outcome, _) in self.outcome_tokens.iter() {
             let weight_for_outcome = self.get_odds_weight_for_outcome(outcome);
 
@@ -339,23 +444,21 @@ impl Pool {
             }
         }
 
-        math::div_u256_to_u128(odds_weight_for_target, odds_weight_sum) 
+        math::div_u128(odds_weight_for_target, odds_weight_sum) 
     }
 
     fn get_odds_weight_for_outcome(
         &self,
         target_outcome: u16
-    ) -> u256 {
-        let zero = u256::from(0);
-        let mut odds_weight_for_target: u256 = zero;
-
+    ) -> u128 {
+        let mut odds_weight_for_target = 0;
         for (outcome, token) in self.outcome_tokens.iter() {
             if outcome != target_outcome {
                 let balance = token.get_balance(&env::current_account_id());
-                odds_weight_for_target = if odds_weight_for_target == zero {
-                    u256::from(balance)
+                odds_weight_for_target = if odds_weight_for_target == 0 {
+                    balance
                 } else {
-                    odds_weight_for_target * u256::from(balance)
+                    math::mul_u128(odds_weight_for_target, balance)
                 };
             }
         }
