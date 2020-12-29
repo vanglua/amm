@@ -1,41 +1,33 @@
 #![allow(clippy::needless_pass_by_value)]
-
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{
     near_bindgen,
+    Promise,
+    PanicOnDefault,
     json_types::{
         U128, 
         U64
     },
+    serde_json,
     AccountId, 
     env,
     collections::{
         UnorderedMap
     },
-    borsh::{
-        BorshDeserialize,
-        BorshSerialize
-    }
 };
 
 use crate::pool::Pool;
+use crate::payload_structs;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct PoolFactory {
     owner: AccountId, // The owner of the contract
+    payment_token: AccountId,
     nonce: u64, // Incrementing number that's used to define a pool's id
     pools: UnorderedMap<u64, Pool> // Maps pool ids to pool
 }
 
-/** 
- * @notice implement `Default` for `PoolFactory` - allowing for a default state to be set
- * @panics if the contract hasn't been initialized yet, there is no default state
- */
-impl Default for PoolFactory {
-    fn default() -> Self {
-        panic!("ERR_CONTRACT_NOT_INITIATED")
-    }
-}
 
 #[near_bindgen]
 impl PoolFactory {
@@ -45,12 +37,13 @@ impl PoolFactory {
      * @param owner The `account_id` that's going to have owner privileges
      */
     #[init]
-    pub fn init(owner: AccountId) -> Self {
+    pub fn init(owner: AccountId, payment_token: AccountId) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         assert!(env::is_valid_account_id(owner.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
         
         Self {
             owner: owner,
+            payment_token,
             nonce: 0,
             pools: UnorderedMap::new(b"pools".to_vec())
         }
@@ -76,67 +69,79 @@ impl PoolFactory {
         U128(pool.get_fees_withdrawable(account_id))
     }
 
+    #[payable]
     pub fn new_pool(
         &mut self, 
-        outcomes: u16, 
+        outcomes: u16,
         swap_fee: U128
     ) -> U64 {
-        let new_pool = Pool::new(env::predecessor_account_id(), self.nonce, outcomes, swap_fee.into());
         let pool_id = self.nonce;
-        
+        let new_pool = Pool::new(
+            env::predecessor_account_id(),
+            pool_id,
+            outcomes,
+            swap_fee.into()
+        );
         self.nonce += 1;
-        
         self.pools.insert(&pool_id, &new_pool);
         pool_id.into()
     }
-
-    pub fn seed_pool(
+    
+    #[payable]
+    fn seed_pool(
         &mut self, 
-        pool_id: U64, 
+        sender: AccountId,
         total_in: U128, 
-        denorm_weights: Vec<U128>
+        args: serde_json::Value, 
     ) {
-        let weights_u128: Vec<u128> = denorm_weights
+        let parsed_args: payload_structs::SeedPool = payload_structs::from_args(args);
+        let weights_u128: Vec<u128> = parsed_args.denorm_weights
             .iter()
             .map(|weight| { u128::from(*weight) })
             .collect();
 
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.seed_pool(
-            &env::predecessor_account_id(), 
+            &sender, 
             total_in.into(), 
             &weights_u128
         );
         
-        self.pools.insert(&pool_id.into(), &pool);
+        self.pools.insert(&parsed_args.pool_id.into(), &pool);
     }
 
-    pub fn join_pool(
+    #[payable]
+    fn join_pool(
         &mut self, 
-        pool_id: U64, 
+        sender: AccountId,
         total_in: U128, 
+        args: serde_json::Value,
     ) {
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let parsed_args: payload_structs::LPPool = payload_structs::from_args(args);
+        let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.join_pool(
             &env::predecessor_account_id(), 
             total_in.into()
         );
         
-        self.pools.insert(&pool_id.into(), &pool);
+        self.pools.insert(&parsed_args.pool_id.into(), &pool);
     }
 
-    pub fn exit_pool(
+    #[payable]
+    fn exit_pool(
         &mut self, 
-        pool_id: U64, 
+        sender: AccountId,
         total_in: U128, 
+        args: serde_json::Value,
     ) {
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let parsed_args: payload_structs::LPPool = payload_structs::from_args(args);
+        let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.exit_pool(
             &env::predecessor_account_id(), 
             total_in.into()
         );
         
-        self.pools.insert(&pool_id.into(), &pool);
+        self.pools.insert(&parsed_args.pool_id.into(), &pool);
     }
 
     pub fn finalize_pool(
@@ -147,6 +152,7 @@ impl PoolFactory {
         pool.finalize(&env::predecessor_account_id());
         self.pools.insert(&pool_id.into(), &pool);
     }
+
 
     pub fn get_pool_balances(
         &self,
@@ -194,24 +200,26 @@ impl PoolFactory {
         U128(pool.calc_sell_tokens_in(collateral_out.into(), outcome_target))
     }
 
-    pub fn buy(
+    #[payable]
+    fn buy(
         &mut self, 
-        pool_id: U64, 
+        sender: AccountId,
         collateral_in: U128, 
-        outcome_target: u16,
-        min_shares_out: U128
+        args: serde_json::Value,
     ) {
-        let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
+        let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
+        let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.buy(
             &env::predecessor_account_id(),
             collateral_in.into(), 
-            outcome_target, 
-            min_shares_out.into()
+            parsed_args.outcome_target, 
+            parsed_args.min_shares_out.into()
         );
-        self.pools.insert(&pool_id.into(), &pool);
+        self.pools.insert(&parsed_args.pool_id.into(), &pool);
     }
 
-    pub fn sell(
+    #[payable]
+    fn sell(
         &mut self, 
         pool_id: U64, 
         collateral_out: U128, 
@@ -227,5 +235,28 @@ impl PoolFactory {
         self.pools.insert(&pool_id.into(), &pool);
     }
 
+    pub fn on_receive_with_vault(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        vault_id: u64,
+        payload: String,
+    ) -> Promise {
+        assert_eq!(env::predecessor_account_id(), self.payment_token, "ERR_INVALID_SENDER");
+        // Check sender is payment token address
+        let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
+
+        match parsed_payload.function.as_str() {
+            "join_pool" => self.seed_pool(sender_id, amount.into(), parsed_payload.args),
+            // "finalize_pool" => self.exit_pool(pool_id: U64, total_in: U128),
+            // "seed_pool" => self.seed_pool(pool_id: U64, total_in: U128, denorm_weights: Vec<U128>),
+            // "join_pool" => self.join_pool(pool_id: U64, total_in: U128),
+            // "exit_pool" => self.exit_pool(pool_id: U64, total_in: U128),
+            // "buy" => self.buy(pool_id: U64, collateral_in: U128, outcome_target: u16, min_shares_out: U128),
+            // "sell" => self.sell(pool_id: U64, collateral_out: U128, outcome_target: u16, max_shares_in: U128),
+            _ => panic!("ERR_INVALID_TYPE")
+        };
+        Promise::new(env::current_account_id())
+    }
 
 }

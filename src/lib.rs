@@ -1,4 +1,3 @@
-
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(dead_code, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
 #[cfg(feature = "wee_alloc")]
@@ -15,6 +14,7 @@ construct_uint! {
 
 #[macro_use]
 /** core */
+mod payload_structs;
 mod pool_factory;
 mod pool;
 mod vault_token;

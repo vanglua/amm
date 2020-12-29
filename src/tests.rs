@@ -1,46 +1,134 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use near_sdk::{
-    AccountId, 
+    AccountId,
     VMContext, 
-    testing_env, 
+    testing_env,
     MockedBlockchain, 
     json_types::{
         U64,
         U128
-    }
+    },
+    serde_json::json
+};
+
+use near_sdk_sim::{
+    transaction::{
+        ExecutionOutcome,
+        ExecutionStatus
+    },
+    call, 
+    deploy, 
+    init_simulator, 
+    near_crypto::Signer, 
+    to_yocto, view, 
+    ContractAccount, 
+    UserAccount, 
+    STORAGE_AMOUNT,
+    DEFAULT_GAS,
+    account::AccessKey
 };
 
 use crate::constants;
 use crate::math;
+use crate::pool_factory;
 use crate::pool_factory::PoolFactory;
+use pool_factory::PoolFactoryContract;
 
-fn contract_id() -> String {
-    "contract".to_string()
+/// Load in contract bytes
+near_sdk_sim::lazy_static! {
+    static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("../res/flux_amm.wasm").as_ref();
+    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../res/vault_token.wasm").as_ref();
 }
 
-fn alice() -> String {
-    "alice".to_string()
+fn init(
+    initial_balance: u128,
+    owner_id: String
+) -> (UserAccount, ContractAccount<PoolFactoryContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
+    let master_account = init_simulator(None);
+    // deploy amm
+    let amm_contract = deploy!(
+        // Contract Proxy
+        contract: PoolFactoryContract,
+        // Contract account id
+        contract_id: "amm",
+        // Bytes of contract
+        bytes: &AMM_WASM_BYTES,
+        // User deploying the contract,
+        signer_account: master_account,
+        // init method
+        init_method: init(owner_id.to_string(), "token".to_string())
+    );
+
+    let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
+    let tx = token_contract.create_transaction(token_contract.account_id());
+    // uses default values for deposit and gas
+    let res = tx
+        .transfer(initial_balance)
+        .deploy_contract((&TOKEN_WASM_BYTES).to_vec())
+        .submit();
+
+    init_token(&token_contract, owner_id.to_string(), initial_balance);
+
+    let alice = master_account.create_user("alice".to_string(), to_yocto("100"));
+    let bob = master_account.create_user("bob".to_string(), to_yocto("100"));
+    let carol = master_account.create_user("carol".to_string(), to_yocto("100"));
+
+    (master_account, amm_contract, token_contract, alice, bob, carol)
 }
 
-fn bob() -> String {
-    "bob".to_string()
+fn init_token(
+    token_contract: &UserAccount,
+    owner_id: AccountId,
+    initial_balance: u128
+) {
+    let tx = token_contract.create_transaction(token_contract.account_id());
+    let args = json!({
+        "owner_id": owner_id,
+        "total_supply": U128(initial_balance)
+
+    }).to_string().as_bytes().to_vec();
+    let res = tx.function_call("init".into(), args, DEFAULT_GAS, 0).submit();
+    if !res.is_ok() {
+        panic!("token initiation failed")
+    }
 }
 
-fn carol() -> String {
-    "carol".to_string()
+fn get_balance(token_account: UserAccount, account_id: AccountId) -> u128 {
+    let tx = token_account.create_transaction(token_account.account_id());
+    let args = json!({
+        "account_id": account_id
+    }).to_string().as_bytes().to_vec();
+    let res = tx.function_call("get_balance".into(), args, 100000000000000, 0).submit();
+    let balance: U128 = res.unwrap_json();
+    balance.into()
 }
 
-fn token_a() -> String {
-    "t1".to_string()
+fn transfer_unsafe(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128) {
+    let tx = from.create_transaction(token_account.account_id());
+    let args = json!({
+        "account_id": to,
+        "amount": U128(amt)
+    }).to_string().as_bytes().to_vec();
+
+    let res = tx.function_call("transfer_unsafe".into(), args, 100000000000000, 0).submit();
+    if !res.is_ok() {
+        panic!("token initiation failed")
+    }
 }
 
-fn token_b() -> String {
-    "t2".to_string()
-}
+fn transfer_with_vault(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128, payload: String) {
+    let tx = from.create_transaction(token_account.account_id());
+    let args = json!({
+        "account_id": to,
+        "amount": U128(amt),
+        "payload": payload
+    }).to_string().as_bytes().to_vec();
 
-fn token_c() -> String {
-    "t3".to_string()
+    let res = tx.function_call("transfer_with_safe".into(), args, 100000000000000, 0).submit();
+    if !res.is_ok() {
+        panic!("token initiation failed")
+    }
 }
 
 fn to_token_denom(amt: u128) -> u128 {
@@ -49,31 +137,6 @@ fn to_token_denom(amt: u128) -> u128 {
 
 fn swap_fee() -> U128 {
     U128(to_token_denom(3) / 1000)
-}
-
-fn get_context(
-    predecessor_account_id: AccountId, 
-    block_timestamp: u64
-) -> VMContext {
-
-    VMContext {
-        current_account_id: "contract".to_string(),
-        signer_account_id: bob(),
-        signer_account_pk: vec![0, 1, 2],
-        predecessor_account_id,
-        input: vec![],
-        block_index: 0,
-        epoch_height: 0,
-        account_balance: 0,
-        is_view: false,
-        storage_usage: 10000,
-        block_timestamp,
-        account_locked_balance: 0,
-        attached_deposit: 0,
-        prepaid_gas: 30_000_000_000_000_000,
-        random_seed: vec![0, 1, 2],
-        output_data_receivers: vec![],
-    }
 }
 
 fn product_of(nums: &Vec<u128>) -> u128 {
@@ -103,9 +166,10 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
     vec_in.iter().map(|n| { U128(*n) }).collect()
 }
 
+// runtime tests
 mod init_tests;
 mod pool_initiation_tests;
-mod pricing_tests;
-mod swap_tests;
-mod liquidity_tests;
-mod fee_tests;
+// mod pricing_tests;
+// mod swap_tests;
+// mod liquidity_tests;
+// mod fee_tests;
