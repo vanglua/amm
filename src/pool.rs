@@ -98,8 +98,8 @@ impl Pool {
             outcome_tokens_to_return.insert(i, total_in - remaining);
         }
 
-        // Send collateral in and calculate if collateral should be returned
-        if self.pool_token.total_supply() > 0 {
+        let pool_token_supply = self.pool_token.total_supply();
+        if pool_token_supply > 0 {
             self.outcome_tokens.clear();
             self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
         } 
@@ -261,11 +261,14 @@ impl Pool {
 
     pub fn finalize(
         &mut self,
-        sender: &AccountId
-    ) {
+        sender: &AccountId,
+        amount_in: u128
+    ) -> u128{
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert_eq!(self.outcome_tokens.len() as u16, self.num_of_outcomes, "ERR_NOT_BINDED");
+        assert!(amount_in >= self.pool_token.total_supply(), "ERR_INSUFFICIENT_COLLATERAL");
         self.finalized = true;
+        self.pool_token.total_supply()
     }
 
     pub fn calc_buy_amount(

@@ -13,6 +13,7 @@ use near_sdk::{
 };
 
 use near_sdk_sim::{
+    ExecutionResult,
     transaction::{
         ExecutionOutcome,
         ExecutionStatus
@@ -21,7 +22,8 @@ use near_sdk_sim::{
     deploy, 
     init_simulator, 
     near_crypto::Signer, 
-    to_yocto, view, 
+    to_yocto, 
+    view, 
     ContractAccount, 
     UserAccount, 
     STORAGE_AMOUNT,
@@ -60,17 +62,19 @@ fn init(
         init_method: init(owner_id.to_string(), "token".to_string())
     );
 
+    
+
     let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
     let tx = token_contract.create_transaction(token_contract.account_id());
     // uses default values for deposit and gas
     let res = tx
-        .transfer(initial_balance)
+        .transfer(to_yocto("1"))
         .deploy_contract((&TOKEN_WASM_BYTES).to_vec())
         .submit();
 
     init_token(&token_contract, owner_id.to_string(), initial_balance);
 
-    let alice = master_account.create_user("alice".to_string(), to_yocto("100"));
+    let alice = master_account.create_user("alice".to_string(), to_yocto("1000"));
     let bob = master_account.create_user("bob".to_string(), to_yocto("100"));
     let carol = master_account.create_user("carol".to_string(), to_yocto("100"));
 
@@ -90,11 +94,11 @@ fn init_token(
     }).to_string().as_bytes().to_vec();
     let res = tx.function_call("init".into(), args, DEFAULT_GAS, 0).submit();
     if !res.is_ok() {
-        panic!("token initiation failed")
+        panic!("token initiation failed: {:?}", res);
     }
 }
 
-fn get_balance(token_account: UserAccount, account_id: AccountId) -> u128 {
+fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     let tx = token_account.create_transaction(token_account.account_id());
     let args = json!({
         "account_id": account_id
@@ -104,7 +108,7 @@ fn get_balance(token_account: UserAccount, account_id: AccountId) -> u128 {
     balance.into()
 }
 
-fn transfer_unsafe(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128) {
+fn transfer_unsafe(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128)  {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
         "account_id": to,
@@ -117,18 +121,21 @@ fn transfer_unsafe(token_account: UserAccount, from: UserAccount, to: AccountId,
     }
 }
 
-fn transfer_with_vault(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128, payload: String) {
+fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128, payload: String) -> ExecutionResult {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
-        "account_id": to,
+        "receiver_id": to,
         "amount": U128(amt),
         "payload": payload
     }).to_string().as_bytes().to_vec();
 
+    println!("from token: {}, from address: {}, to: {}, amt: {}, payload: {}", token_account.account_id(), from.account_id(), to, amt, payload);
+
     let res = tx.function_call("transfer_with_safe".into(), args, 100000000000000, 0).submit();
     if !res.is_ok() {
-        panic!("token initiation failed")
+        panic!("tx failed: {:?}", res);
     }
+    res
 }
 
 fn to_token_denom(amt: u128) -> u128 {
@@ -167,9 +174,9 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 }
 
 // runtime tests
-mod init_tests;
-mod pool_initiation_tests;
-// mod pricing_tests;
+// mod init_tests;
+// mod pool_initiation_tests;
+mod pricing_tests;
 // mod swap_tests;
 // mod liquidity_tests;
 // mod fee_tests;
