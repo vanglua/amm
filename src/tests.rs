@@ -108,16 +108,16 @@ fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     balance.into()
 }
 
-fn transfer_unsafe(token_account: UserAccount, from: UserAccount, to: AccountId, amt: u128)  {
+fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128)  {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
-        "account_id": to,
+        "receiver_id": to,
         "amount": U128(amt)
     }).to_string().as_bytes().to_vec();
 
     let res = tx.function_call("transfer_unsafe".into(), args, 100000000000000, 0).submit();
     if !res.is_ok() {
-        panic!("token initiation failed")
+        panic!("ERR_TRANSFER_FAILED: {:?}", res);
     }
 }
 
@@ -128,8 +128,6 @@ fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: Acco
         "amount": U128(amt),
         "payload": payload
     }).to_string().as_bytes().to_vec();
-
-    println!("from token: {}, from address: {}, to: {}, amt: {}, payload: {}", token_account.account_id(), from.account_id(), to, amt, payload);
 
     let res = tx.function_call("transfer_with_safe".into(), args, 100000000000000, 0).submit();
     if !res.is_ok() {
@@ -146,22 +144,22 @@ fn swap_fee() -> U128 {
     U128(to_token_denom(3) / 1000)
 }
 
-fn product_of(nums: &Vec<u128>) -> u128 {
+fn product_of(nums: &Vec<U128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
     let mut product = constants::TOKEN_DENOM;
 
     for price in nums.to_vec() {
-        product = math::mul_u128(product, price);
+        product = math::mul_u128(product, u128::from(price));
     }
     
     product
 }
 
-fn calc_weights_from_price(prices: Vec<u128>) -> Vec<u128> {
+fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
     let product = product_of(&prices);
     
     prices.iter().map(|price| {
-       math::div_u128(product, *price)
+       U128(math::div_u128(u128::from(product), u128::from(*price)))
     }).collect()
 }
 
@@ -174,9 +172,10 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 }
 
 // runtime tests
-// mod init_tests;
-// mod pool_initiation_tests;
+
+mod init_tests;
+mod pool_initiation_tests;
 mod pricing_tests;
-// mod swap_tests;
-// mod liquidity_tests;
+mod swap_tests;
+mod liquidity_tests;
 // mod fee_tests;

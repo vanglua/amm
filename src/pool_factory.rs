@@ -36,6 +36,7 @@ pub struct PoolFactory {
 #[ext_contract]
 pub trait PaymentToken {
     fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: AccountId, amount: U128);
+    fn transfer_unsafe(&mut self, receiver_id: AccountId, amount: U128);
 }
 
 
@@ -122,17 +123,26 @@ impl PoolFactory {
     fn join_pool(
         &mut self, 
         sender: AccountId,
+        vault_id: u64,
         total_in: u128, 
         args: serde_json::Value,
-    ) {
+    ) -> Promise {
         let parsed_args: payload_structs::LPPool = payload_structs::from_args(args);
         let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.join_pool(
-            &env::predecessor_account_id(), 
+            &sender, 
             total_in
         );
-        
         self.pools.insert(&parsed_args.pool_id.into(), &pool);
+
+        payment_token::withdraw_from_vault(
+            vault_id, 
+            env::current_account_id(), 
+            total_in.into(),
+            &self.payment_token,
+            0,
+            GAS_BASE_COMPUTE
+        )
     }
 
     pub fn exit_pool(
@@ -220,9 +230,10 @@ impl PoolFactory {
     fn buy(
         &mut self, 
         sender: AccountId,
+        vault_id: u64,
         collateral_in: u128, 
         args: serde_json::Value,
-    ) {
+    ) -> Promise {
         let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
         let mut pool = self.pools.get(&parsed_args.pool_id.into()).expect("ERR_NO_POOL");
         pool.buy(
@@ -232,6 +243,15 @@ impl PoolFactory {
             parsed_args.min_shares_out.into()
         );
         self.pools.insert(&parsed_args.pool_id.into(), &pool);
+
+        payment_token::withdraw_from_vault(
+            vault_id, 
+            env::current_account_id(), 
+            collateral_in.into(),
+            &self.payment_token,
+            0,
+            GAS_BASE_COMPUTE
+        )
     }
 
     #[payable]
@@ -241,7 +261,7 @@ impl PoolFactory {
         collateral_out: U128, 
         outcome_target: u16,
         max_shares_in: U128
-    ) {
+    ) -> Promise {
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
         pool.sell(
             collateral_out.into(), 
@@ -249,14 +269,22 @@ impl PoolFactory {
             max_shares_in.into()
         );
         self.pools.insert(&pool_id.into(), &pool);
+
+        payment_token::transfer_unsafe(
+            env::predecessor_account_id(), 
+            collateral_out.into(),
+            &self.payment_token,
+            0,
+            GAS_BASE_COMPUTE
+        )
     }
 
     #[payable]
     pub fn on_receive_with_vault(
         &mut self,
         sender_id: AccountId,
-        amount: U128,
         vault_id: u64,
+        amount: U128,
         payload: String,
     ) -> Promise {
         assert_eq!(env::predecessor_account_id(), self.payment_token, "ERR_INVALID_SENDER");
@@ -265,8 +293,8 @@ impl PoolFactory {
 
         match parsed_payload.function.as_str() {
             "finalize" => return self.finalize_pool(sender_id, vault_id, amount.into(), parsed_payload.args),
-            // "join_pool" => self.join_pool(sender, amount.into(), parsed_payload.args),
-            // "buy" => self.buy(sender, amount.into(), parsed_payload.args),
+            "join_pool" => return self.join_pool(sender_id, vault_id, amount.into(), parsed_payload.args),
+            "buy" => return self.buy(sender_id, vault_id, amount.into(), parsed_payload.args),
             _ => panic!("ERR_INVALID_TYPE")
         };
     }
