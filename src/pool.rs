@@ -99,6 +99,7 @@ impl Pool {
         }
 
         let pool_token_supply = self.pool_token.total_supply();
+
         if pool_token_supply > 0 {
             self.outcome_tokens.clear();
             self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
@@ -144,7 +145,7 @@ impl Pool {
         &mut self,
         sender: &AccountId,
         total_in: u128
-    ) {
+    ) ->  u128 {
         let balances = self.get_pool_balances();
         let pool_token_supply = self.pool_token.total_supply();
 
@@ -156,7 +157,7 @@ impl Pool {
             self.outcome_tokens.insert(&outcome, &token);
         }
 
-        self.burn_internal(sender, total_in);
+        self.burn_internal(sender, total_in)
     }
 
     fn mint_and_transfer_outcome_tokens(
@@ -193,9 +194,10 @@ impl Pool {
         &mut self,
         from: &AccountId,
         amount: u128
-    ) {
-        self.before_pool_token_transfer(Some(from), None, amount);
+    ) -> u128 {
+        let fees = self.before_pool_token_transfer(Some(from), None, amount);
         self.pool_token.burn(from, amount);
+        return fees;
     }
 
     fn before_pool_token_transfer(
@@ -203,10 +205,10 @@ impl Pool {
         from: Option<&AccountId>,
         to: Option<&AccountId>,
         amount: u128
-    ) {
-
+    ) -> u128 {
+        let mut fees = 0;
         if let Some(account_id) = from {
-            self.withdraw_fees(account_id);
+            fees = self.withdraw_fees(account_id);
         }
 
         let total_supply = self.pool_token.total_supply();
@@ -233,6 +235,7 @@ impl Pool {
             self.fee_pool_weight -= ineligible_fee_amount;
         }
 
+        return fees;
     }
 
     pub fn get_fees_withdrawable(&self, account_id: &AccountId) -> u128 {
@@ -246,7 +249,7 @@ impl Pool {
     pub fn withdraw_fees(
         &mut self,
         account_id: &AccountId
-    )  {
+    ) -> u128 {
         let pool_token_bal = self.pool_token.get_balance(account_id);
         let pool_token_total_supply = self.pool_token.total_supply();
         let raw_amount = math::div_u128(math::mul_u128(self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
@@ -255,8 +258,8 @@ impl Pool {
         if withdrawable_amount > 0 {
             self.withdrawn_fees.insert(account_id, &raw_amount);
             self.total_withdrawn_fees += withdrawable_amount;
-            // Transfer collat back to user
         }
+        return withdrawable_amount;
     }  
 
     pub fn finalize(

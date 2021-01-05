@@ -115,7 +115,7 @@ fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountI
         "amount": U128(amt)
     }).to_string().as_bytes().to_vec();
 
-    let res = tx.function_call("transfer_unsafe".into(), args, 100000000000000, 0).submit();
+    let res = tx.function_call("transfer".into(), args, 100000000000000, 0).submit();
     if !res.is_ok() {
         panic!("ERR_TRANSFER_FAILED: {:?}", res);
     }
@@ -129,7 +129,7 @@ fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: Acco
         "payload": payload
     }).to_string().as_bytes().to_vec();
 
-    let res = tx.function_call("transfer_with_safe".into(), args, 100000000000000, 0).submit();
+    let res = tx.function_call("transfer_with_vault".into(), args, 100000000000000, STORAGE_AMOUNT).submit();
     if !res.is_ok() {
         panic!("tx failed: {:?}", res);
     }
@@ -173,9 +173,9 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 
 // runtime tests
 
-mod init_tests;
-mod pool_initiation_tests;
-mod pricing_tests;
+// mod init_tests;
+// mod pool_initiation_tests;
+// mod pricing_tests;
 mod swap_tests;
-mod liquidity_tests;
+// mod liquidity_tests;
 // mod fee_tests;

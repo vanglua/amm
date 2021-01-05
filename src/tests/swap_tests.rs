@@ -88,6 +88,7 @@ fn basic_buy_test() {
     }).to_string();
 
     let buy_res = transfer_with_vault(&token, &alice, "amm".to_string(), buy_amount, buy_args);
+    println!("buy res: {:?}", buy_res);
 
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
     assert_eq!(seeder_balance, to_yocto("1") - seed_amount - buy_amount);
@@ -235,7 +236,6 @@ fn complex_buy_test() {
             "min_shares_out": U128(to_token_denom(8) / 10)
         }
     }).to_string();
-
     transfer_with_vault(&token, &bob, "amm".to_string(), buy_amount, buy_args);
     
     let post_trade_balances: Vec<U128> = view!(amm.get_pool_balances(pool_id)).unwrap_json();

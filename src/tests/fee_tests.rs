@@ -2,63 +2,105 @@ use super::*;
 
 #[test]
 fn lp_fee_test() {
-    let context = get_context(alice(), 0);
-    testing_env!(context);
-    let funder = &alice();
-    let joiner = &bob();
-    let trader = &carol();
-    let mut contract = PoolFactory::init(funder.to_string());
-    let swap_fee = to_token_denom(2) / 100;
-    let pool_id = contract.new_pool(2, U128(swap_fee));
+    let (master_account, amm, token, funder, joiner, trader) = init(to_yocto("1"), "alice".to_string());
+    let joiner_trader_balances = to_token_denom(10000);
+    let funder_balance = to_yocto("100") - joiner_trader_balances * 2;
+    transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
+    transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
     
-
-    let target_price_a = to_token_denom(5) / 10;
-    let target_price_b = to_token_denom(5) / 10;
-
+    let seed_amt = to_token_denom(1000);
     let buy_amt = to_token_denom(100);
+    let target_price_a = U128(to_token_denom(5) / 10);
+    let target_price_b = U128(to_token_denom(5) / 10);
     let weights = calc_weights_from_price(vec![target_price_a, target_price_b]);
-    let seed_amount = to_token_denom(1000);
-    
-    // SEED
-    contract.seed_pool(pool_id, U128(seed_amount), wrap_u128_vec(&weights));
-    
-    let creator_pool_token_balance: u128 = contract.get_pool_token_balance(pool_id, &alice()).into();
-    
-    contract.finalize_pool(pool_id);
+    let swap_fee = to_token_denom(2) / 100;
 
+    let pool_id: U64 = call!(
+        funder,
+        amm.new_pool(2, U128(swap_fee)),
+        deposit = STORAGE_AMOUNT
+    ).unwrap_json();
+
+    assert_eq!(pool_id, U64(0));
+
+    call!(
+        funder,
+        amm.seed_pool(pool_id, U128(seed_amt), weights),
+        deposit = STORAGE_AMOUNT
+    );
+
+    let finalize_args = json!({
+        "function": "finalize",
+        "args": {
+            "pool_id": pool_id
+        }
+    }).to_string();
+    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amt, finalize_args);
+
+    let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(pool_id, &funder.account_id())).unwrap_json();
+    
     // $1000 in swaps at 2% fee
-    testing_env!(get_context(trader.to_string(), 0));
-    contract.buy(pool_id, U128(buy_amt), 0, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 1, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 0, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 1, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 0, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 1, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 0, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 1, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 0, U128(0));
-    contract.buy(pool_id, U128(buy_amt), 1, U128(0));
+    let buy_a_args = json!({
+        "function": "buy",
+        "args": {
+            "pool_id": pool_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(to_token_denom(8) / 10)
+        }
+    }).to_string();
+    let buy_b_args = json!({
+        "function": "buy",
+        "args": {
+            "pool_id": pool_id,
+            "outcome_target": 1,
+            "min_shares_out": U128(to_token_denom(8) / 10)
+        }
+    }).to_string();
 
-    // Switch context to Bob
-    testing_env!(get_context(joiner.to_string(), 0));
-    contract.join_pool(pool_id, U128(seed_amount));
-    let joiner_pool_token_balance: u128 = contract.get_pool_token_balance(pool_id, &bob()).into();
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
+    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
 
-    let expected_claimable_by_funder = to_token_denom(20);
-    let claimable_by_funder = contract.get_fees_withdrawable(pool_id, funder);
+    // joiner
+    let join_pool_args = json!({
+        "function": "join_pool",
+        "args": {
+            "pool_id": pool_id
+        }
+    }).to_string();
+    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amt, join_pool_args);
+
+    let joiner_pool_balance: U128 = view!(amm.get_pool_token_balance(pool_id, &joiner.account_id())).unwrap_json();
+
     
-    let claimable_by_leech = contract.get_fees_withdrawable(pool_id, joiner);
-
-    contract.exit_pool(pool_id, U128(joiner_pool_token_balance));
-    testing_env!(get_context(funder.to_string(), 0));
-    contract.exit_pool(pool_id, U128(creator_pool_token_balance));
-
+    let expected_claimable_by_funder = to_token_denom(20);
+    let claimable_by_funder: U128 = view!(amm.get_fees_withdrawable(pool_id, &funder.account_id())).unwrap_json();
+    let claimable_by_joiner: U128 = view!(amm.get_fees_withdrawable(pool_id, &joiner.account_id())).unwrap_json();
     assert_eq!(U128(expected_claimable_by_funder), claimable_by_funder);
-    assert_eq!(claimable_by_leech, U128(0));
+    assert_eq!(claimable_by_joiner, U128(0));
 
-    let funder_pool_token_bal: u128 = contract.get_pool_token_balance(pool_id, funder).into();
-    let joiner_pool_token_bal: u128 = contract.get_pool_token_balance(pool_id, joiner).into();
+    let funder_exit_res = call!(
+        funder,
+        amm.exit_pool(pool_id, funder_pool_balance),
+        deposit = STORAGE_AMOUNT
+    );
+    let joiner_exit_res = call!(
+        joiner,
+        amm.exit_pool(pool_id, joiner_pool_balance),
+        deposit = STORAGE_AMOUNT
+    );
 
-    assert_eq!(funder_pool_token_bal, 0);
-    assert_eq!(joiner_pool_token_bal, 0);
+    println!("res {:?}", joiner_exit_res);
+
+    let funder_pool_token_balance_after_exit: U128 = view!(amm.get_pool_token_balance(pool_id, &funder.account_id())).unwrap_json();
+    let joiner_pool_token_balance_after_exit: U128 = view!(amm.get_pool_token_balance(pool_id, &joiner.account_id())).unwrap_json();
+    assert_eq!(funder_pool_token_balance_after_exit, U128(0));
+    assert_eq!(joiner_pool_token_balance_after_exit, U128(0));
 }
