@@ -1,6 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{
+    PromiseOrValue,
     Balance,
     StorageUsage,
     Gas,
@@ -100,7 +101,7 @@ impl PoolFactory {
         );
         self.nonce += 1;
         self.pools.insert(&pool_id, &new_pool);
-        self.refund_storage(initial_storage);
+        self.refund_storage(initial_storage, env::predecessor_account_id());
 
         pool_id.into()
     }
@@ -127,7 +128,7 @@ impl PoolFactory {
         );
         
         self.pools.insert(&pool_id.into(), &pool);
-        self.refund_storage(initial_storage);
+        self.refund_storage(initial_storage, env::predecessor_account_id());
     }
 
     #[payable]
@@ -135,7 +136,7 @@ impl PoolFactory {
         &mut self, 
         pool_id: U64,
         total_in: U128, 
-    ) -> Promise {
+    ) -> PromiseOrValue<bool> {
         let initial_storage = env::storage_usage();
 
         let mut pool = self.pools.get(&pool_id.into()).expect("ERR_NO_POOL");
@@ -146,14 +147,21 @@ impl PoolFactory {
         
         self.pools.insert(&pool_id.into(), &pool);
 
-        self.refund_storage(initial_storage);
-        collateral_token::transfer(
-            env::predecessor_account_id(), 
-            fees_earned.into(),
-            &self.collateral_token,
-            0,
-            GAS_BASE_COMPUTE
-        )
+        self.refund_storage(initial_storage, env::predecessor_account_id());
+
+        if fees_earned > 0 {
+            return PromiseOrValue::Promise(
+                collateral_token::transfer(
+                    env::predecessor_account_id(), 
+                    fees_earned.into(),
+                    &self.collateral_token,
+                    0,
+                    GAS_BASE_COMPUTE
+                )
+            )
+        } else {
+            return PromiseOrValue::Value(true)
+        }
     }
 
     pub fn get_pool_balances(
@@ -219,7 +227,7 @@ impl PoolFactory {
             max_shares_in.into()
         );
         self.pools.insert(&pool_id.into(), &pool);
-        self.refund_storage(initial_storage);
+        self.refund_storage(initial_storage, env::predecessor_account_id());
 
         collateral_token::transfer(
             env::predecessor_account_id(), 
@@ -246,13 +254,13 @@ impl PoolFactory {
 
         let prom: Promise;
         match parsed_payload.function.as_str() {
-            "finalize" => prom = self.finalize_pool(sender_id, vault_id, amount.into(), parsed_payload.args),
-            "join_pool" => prom = self.join_pool(sender_id, vault_id, amount.into(), parsed_payload.args),
-            "buy" => prom = self.buy(sender_id, vault_id, amount.into(), parsed_payload.args),
+            "finalize" => prom = self.finalize_pool(&sender_id, vault_id, amount.into(), parsed_payload.args),
+            "join_pool" => prom = self.join_pool(&sender_id, vault_id, amount.into(), parsed_payload.args),
+            "buy" => prom = self.buy(&sender_id, vault_id, amount.into(), parsed_payload.args),
             _ => panic!("ERR_INVALID_TYPE")
         };
 
-        self.refund_storage(initial_storage);
+        self.refund_storage(initial_storage, sender_id);
         prom
     }
 }
@@ -261,7 +269,7 @@ impl PoolFactory {
 
     fn finalize_pool(
         &mut self,
-        sender: AccountId,
+        sender: &AccountId,
         vault_id: u64,
         total_in: u128, 
         args: serde_json::Value,
@@ -283,7 +291,7 @@ impl PoolFactory {
 
     fn join_pool(
         &mut self, 
-        sender: AccountId,
+        sender: &AccountId,
         vault_id: u64,
         total_in: u128, 
         args: serde_json::Value,
@@ -308,7 +316,7 @@ impl PoolFactory {
 
     fn buy(
         &mut self, 
-        sender: AccountId,
+        sender: &AccountId,
         vault_id: u64,
         collateral_in: u128, 
         args: serde_json::Value,
@@ -333,7 +341,7 @@ impl PoolFactory {
         )
     }
 
-    fn refund_storage(&self, initial_storage: StorageUsage) {
+    fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
         let current_storage = env::storage_usage();
         let attached_deposit = env::attached_deposit();
         let refund_amount = if current_storage > initial_storage {
@@ -352,7 +360,7 @@ impl PoolFactory {
         };
         if refund_amount > 0 {
             env::log(format!("Refunding {} tokens for storage", refund_amount).as_bytes());
-            Promise::new(env::predecessor_account_id()).transfer(refund_amount);
+            Promise::new(sender_id).transfer(refund_amount);
         }
     }
 }

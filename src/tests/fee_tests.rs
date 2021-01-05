@@ -38,7 +38,7 @@ fn lp_fee_test() {
     transfer_with_vault(&token, &funder, "amm".to_string(), seed_amt, finalize_args);
 
     let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(pool_id, &funder.account_id())).unwrap_json();
-    
+
     // $1000 in swaps at 2% fee
     let buy_a_args = json!({
         "function": "buy",
@@ -56,7 +56,7 @@ fn lp_fee_test() {
             "min_shares_out": U128(to_token_denom(8) / 10)
         }
     }).to_string();
-
+    
     transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
     transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
     transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
@@ -96,8 +96,6 @@ fn lp_fee_test() {
         amm.exit_pool(pool_id, joiner_pool_balance),
         deposit = STORAGE_AMOUNT
     );
-
-    println!("res {:?}", joiner_exit_res);
 
     let funder_pool_token_balance_after_exit: U128 = view!(amm.get_pool_token_balance(pool_id, &funder.account_id())).unwrap_json();
     let joiner_pool_token_balance_after_exit: U128 = view!(amm.get_pool_token_balance(pool_id, &joiner.account_id())).unwrap_json();

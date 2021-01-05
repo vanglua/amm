@@ -37,10 +37,12 @@ use crate::pool_factory;
 use crate::pool_factory::PoolFactory;
 use pool_factory::PoolFactoryContract;
 
+const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
+
 /// Load in contract bytes
 near_sdk_sim::lazy_static! {
     static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("../res/flux_amm.wasm").as_ref();
-    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../res/vault_token.wasm").as_ref();
+    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../res/vault_token_w_logs.wasm").as_ref();
 }
 
 fn init(
@@ -74,9 +76,15 @@ fn init(
 
     init_token(&token_contract, owner_id.to_string(), initial_balance);
 
+    
     let alice = master_account.create_user("alice".to_string(), to_yocto("1000"));
+    
+    register(&token_contract, &alice, &"amm".to_string());
+
     let bob = master_account.create_user("bob".to_string(), to_yocto("100"));
+    register(&token_contract, &alice, &bob.account_id());
     let carol = master_account.create_user("carol".to_string(), to_yocto("100"));
+    register(&token_contract, &alice, &carol.account_id());
 
     (master_account, amm_contract, token_contract, alice, bob, carol)
 }
@@ -108,6 +116,17 @@ fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     balance.into()
 }
 
+fn register(token_account: &UserAccount, sender: &UserAccount, to_register: &AccountId)  {
+    let tx = sender.create_transaction(token_account.account_id());
+    let args = json!({
+        "account_id": to_register
+    }).to_string().as_bytes().to_vec();
+    let res = tx.function_call("register_account".into(), args, 100000000000000, REGISTRY_STORAGE).submit();
+    if !res.is_ok() {
+        panic!("ERR_REGISTER_FAILED: {:?}", res);
+    }
+}
+
 fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128)  {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
@@ -128,7 +147,7 @@ fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: Acco
         "amount": U128(amt),
         "payload": payload
     }).to_string().as_bytes().to_vec();
-
+    
     let res = tx.function_call("transfer_with_vault".into(), args, 100000000000000, STORAGE_AMOUNT).submit();
     if !res.is_ok() {
         panic!("tx failed: {:?}", res);
@@ -173,9 +192,9 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 
 // runtime tests
 
-// mod init_tests;
-// mod pool_initiation_tests;
-// mod pricing_tests;
+mod init_tests;
+mod pool_initiation_tests;
+mod pricing_tests;
 mod swap_tests;
-// mod liquidity_tests;
-// mod fee_tests;
+mod liquidity_tests;
+mod fee_tests;

@@ -82,13 +82,13 @@ fn join_pool_uneven_liq_test() {
         deposit = STORAGE_AMOUNT
     );
 
-    let join_args = json!({
-        "function": "join_pool",
+    let finalize_args = json!({
+        "function": "finalize",
         "args": {
-            "pool_id": pool_id,
+            "pool_id": pool_id
         }
     }).to_string();
-    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, join_args);
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, finalize_args);
 
     let price_0: U128 = view!(amm.get_spot_price_sans_fee(pool_id, 0)).unwrap_json();
     let price_1: U128 = view!(amm.get_spot_price_sans_fee(pool_id, 1)).unwrap_json();
