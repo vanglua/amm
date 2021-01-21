@@ -176,7 +176,8 @@ impl FluxProtocol {
             finalized: false
         };
         
-        logger::log_market(U64(market_id), description, extra_info, outcome_tags, &market);
+        logger::log_market(&market, description, extra_info, outcome_tags);
+        logger::log_market_status(&market);
         
         self.markets.insert(&market_id, &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
@@ -353,13 +354,13 @@ impl FluxProtocol {
             Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
             None => ()
         };
-        
-        logger::log_market_resoluted(market_id, &payout_numerator);
-        
+                
         market.payout_numerator = payout_numerator;
         market.finalized = true;
         self.markets.insert(&market_id.0, &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
+    
+        logger::log_market_status(&market);
     }
 
     pub fn set_gov(

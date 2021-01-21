@@ -37,20 +37,33 @@ pub fn log_pool(pool: &Pool) {
 
 // NEW_MARKET env log
 pub fn log_market(
-    id: U64,
+    market: &Market,
     description: String,  
     extra_info: String,  
-    outcome_tags: Vec<String>,  
-    market: &Market
+    outcome_tags: Vec<String>
 ) {
 	env::log(
 		json!({
 			"type": "markets".to_string(),
 			"params": {
-                "id": id,
+                "id": market.pool.id,
                 "description": description,
                 "extra_info": extra_info,
                 "outcome_tags": outcome_tags,
+                "end_time": U64(market.end_time),
+			}
+		})
+		.to_string()
+		.as_bytes()
+	);
+}
+
+pub fn log_market_status(market: &Market) {
+    env::log(
+		json!({
+			"type": "market_statuses".to_string(),
+			"params": {
+                "id": market.pool.id,
                 "payout_numerator": market.payout_numerator,
                 "finalized": market.finalized
 			}
@@ -152,21 +165,22 @@ pub fn log_sell(pool: &Pool, account_id: &AccountId, outcome: u16, shares_in: u1
     log_swap(pool, account_id, outcome, shares_in, amount_out - to_escrow, fee, &SwapType::Sell);
 }
 
-fn log_to_escrow(table: String, market_id: u64, sender: &AccountId, amount: u128){ 
+fn log_to_escrow(escrow_type: String, market_id: u64, sender: &AccountId, amount: u128){ 
     json!({
-        "type": table,
+        "type": "escrow_statuses",
         "params": {
             "market_id": U64(market_id),
             "claimer": sender,
             "payout": U128(amount),
+            "type": escrow_type,
         }
     });
 }
 
-
 pub fn log_to_invalid_escrow(market_id: u64, sender: &AccountId, amount: u128){ 
     log_to_escrow("invalid_escrow".to_string(), market_id, sender, amount);
 }
+
 pub fn log_to_valid_escrow(market_id: u64, sender: &AccountId, amount: u128){ 
     log_to_escrow("valid_escrow".to_string(), market_id, sender, amount);
 }
@@ -189,22 +203,3 @@ pub fn log_claim_earnings(
 		.as_bytes()
 	);
 }
-
-pub fn log_market_resoluted(
-    market_id: U64,
-    payout_numerator: &Option<Vec<U128>>,
-) {
-    env::log(
-		json!({
-			"type": "claims".to_string(),
-			"params": {
-                "market_id": market_id,
-                "payout_numerator": payout_numerator,
-			}
-		})
-		.to_string()
-		.as_bytes()
-	);
-}
-
-// LOG_CALL
