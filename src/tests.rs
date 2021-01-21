@@ -2,9 +2,6 @@
 
 use near_sdk::{
     AccountId,
-    VMContext, 
-    testing_env,
-    MockedBlockchain, 
     json_types::{
         U64,
         U128
