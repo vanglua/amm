@@ -160,7 +160,7 @@ fn log_to_escrow(table: String, market_id: u64, sender: &AccountId, amount: u128
             "claimer": sender,
             "payout": U128(amount),
         }
-    })
+    });
 }
 
 
@@ -192,7 +192,7 @@ pub fn log_claim_earnings(
 
 pub fn log_market_resoluted(
     market_id: U64,
-    payout_numerator: Option<Vec<U128>>,
+    payout_numerator: &Option<Vec<U128>>,
 ) {
     env::log(
 		json!({

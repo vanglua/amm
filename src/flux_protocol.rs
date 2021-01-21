@@ -353,11 +353,13 @@ impl FluxProtocol {
             Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
             None => ()
         };
+        
+        logger::log_market_resoluted(market_id, &payout_numerator);
+        
         market.payout_numerator = payout_numerator;
         market.finalized = true;
         self.markets.insert(&market_id.0, &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
-        logger::log_market_resoluted(market_id, payout_numerator);
     }
 
     pub fn set_gov(
