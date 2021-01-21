@@ -24,6 +24,8 @@ use near_sdk::{
     },
 };
 
+use crate::logger;
+
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const GAS_FOR_CALLBACK: Gas = GAS_BASE_COMPUTE;
 const GAS_FOR_PROMISE: Gas = 5_000_000_000_000;
@@ -57,6 +59,8 @@ trait ExtSelf {
 pub struct MintableToken {
     pub accounts: LookupMap<AccountId, Balance>,
     pub total_supply: Balance,
+    pub pool_id: u64,
+    pub outcome_id: u16,
 }
 
 impl MintableToken {
@@ -67,6 +71,8 @@ impl MintableToken {
         Self {
             total_supply: initial_supply,
             accounts,
+            pool_id,
+            outcome_id
         }
     }
 
@@ -75,6 +81,9 @@ impl MintableToken {
         let account_balance = self.accounts.get(account_id).unwrap_or(0);
         let new_balance = account_balance + amount;
         self.accounts.insert(account_id, &new_balance);
+
+        logger::log_user_balance(&self, account_id, new_balance);
+        logger::log_token_status(&self);
     }
 
     pub fn burn(&mut self, account_id: &AccountId, amount: u128) {
@@ -85,13 +94,19 @@ impl MintableToken {
         balance -= amount;
         self.accounts.insert(account_id, &balance);
         self.total_supply -= amount;
+
+        logger::log_user_balance(&self, &account_id, balance);
+        logger::log_token_status(&self);
     }
 
     pub fn deposit(&mut self, receiver_id: &AccountId, amount: u128) {
         assert!(amount > 0, "Cannot deposit 0 or lower");
 
         let receiver_balance = self.accounts.get(&receiver_id).unwrap_or(0);
-        self.accounts.insert(&receiver_id, &(receiver_balance + amount));
+        let new_balance = receiver_balance + amount;
+
+        self.accounts.insert(&receiver_id, &new_balance);
+        logger::log_user_balance(&self, &receiver_id, new_balance);
     }
 
     pub fn withdraw(&mut self, sender_id: &AccountId, amount: u128) {
@@ -100,7 +115,9 @@ impl MintableToken {
         assert!(amount > 0, "Cannot withdraw 0 or lower");
         assert!(sender_balance >= amount, "Not enough balance");
 
-        self.accounts.insert(&sender_id, &(sender_balance - amount));
+        let new_balance = sender_balance - amount;
+        self.accounts.insert(&sender_id, &new_balance);
+        logger::log_user_balance(&self, &sender_id, new_balance);
     }
 }
 

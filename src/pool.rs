@@ -246,7 +246,6 @@ impl Pool {
                 outcome_token.safe_transfer_from_internal(&env::current_account_id(), sender, *amount);
             }
 
-            logger::log_outcome_token_status(outcome as u16, &self, &outcome_token);
             self.outcome_tokens.insert(&(outcome as u16), &outcome_token);
         }
     }
@@ -540,7 +539,6 @@ impl Pool {
             let mut token = self.outcome_tokens.get(&outcome).expect("ERR_NO_OUTCOME");
             token.burn(&env::current_account_id(), amount);
             
-            logger::log_outcome_token_status(outcome, &self, &token);
             self.outcome_tokens.insert(&outcome, &token);
         }
     }
