@@ -1,7 +1,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use near_sdk::{
-    serde_json,
     json_types::{
         U128,
     },
@@ -25,24 +24,11 @@ use near_sdk::{
     },
 };
 
-use serde_json::json;
-
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const GAS_FOR_CALLBACK: Gas = GAS_BASE_COMPUTE;
 const GAS_FOR_PROMISE: Gas = 5_000_000_000_000;
 const GAS_FOR_DATA_DEPENDENCY: Gas = 10_000_000_000_000;
 const GAS_FOR_REMAINING_COMPUTE: Gas = 2 * GAS_FOR_PROMISE + GAS_FOR_DATA_DEPENDENCY + GAS_BASE_COMPUTE;
-
-/// Safe identifier.
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Copy)]
-#[serde(crate = "near_sdk::serde")]
-pub struct VaultId(pub u64);
-
-impl VaultId {
-    pub fn next(self) -> Self {
-        Self(self.0 + 1)
-    }
-}
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Vault {
@@ -57,14 +43,14 @@ trait ExtTokenReceiver {
         &mut self,
         sender_id: AccountId,
         amount: U128,
-        vault_id: VaultId,
+        vault_id: u64,
         payload: String,
     ) -> Promise;
 }
 
 #[ext_contract(ext_self)]
 trait ExtSelf {
-    fn resolve_vault(&mut self, vault_id: VaultId, sender_id: AccountId) -> U128;
+    fn resolve_vault(&mut self, vault_id: u64, sender_id: AccountId) -> U128;
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -80,7 +66,7 @@ impl MintableToken {
 
         Self {
             total_supply: initial_supply,
-            accounts: accounts,
+            accounts,
         }
     }
 
@@ -121,8 +107,8 @@ impl MintableToken {
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct MintableFungibleTokenVault {
     token: MintableToken,
-    vaults: LookupMap<VaultId, Vault>,
-    next_vault_id: VaultId,
+    vaults: LookupMap<u64, Vault>,
+    next_vault_id: u64,
 }
 
 impl Default for MintableFungibleTokenVault {
@@ -136,7 +122,7 @@ impl MintableFungibleTokenVault {
         Self {
             token: MintableToken::new(pool_id, outcome_id, seed_nonce, initial_supply),
             vaults: LookupMap::new(format!("vault:token:{}:{}:{}", pool_id, outcome_id, seed_nonce).as_bytes().to_vec()),
-            next_vault_id: VaultId(0),
+            next_vault_id: 0,
         }
     }
 
@@ -156,6 +142,10 @@ impl MintableFungibleTokenVault {
         self.token.burn(account_id, amount);
     }
 
+    pub fn remove_account(&mut self, account_id: &AccountId) -> Option<u128> {
+        self.token.accounts.remove(account_id)
+    }
+
     pub fn transfer_no_vault(&mut self, receiver_id: &AccountId, amount: u128) {
         self.token.withdraw(&env::predecessor_account_id(), amount);
         self.token.deposit(receiver_id, amount);
@@ -172,7 +162,7 @@ impl MintableFungibleTokenVault {
         let sender_id = env::predecessor_account_id();
 
         self.token.withdraw(&sender_id, amount);
-        self.next_vault_id = vault_id.next();
+        self.next_vault_id += 1;
 
         let vault = Vault {
             balance: amount,
@@ -200,14 +190,10 @@ impl MintableFungibleTokenVault {
         ))
     }
 
-    pub fn resolve_vault(&mut self, vault_id: VaultId, sender_id: &AccountId) -> u128 {
+    pub fn resolve_vault(&mut self, vault_id: u64, sender_id: &AccountId) -> u128 {
         assert_eq!(env::current_account_id(), env::predecessor_account_id(), "Private method can only be called by contract");
 
         let vault = self.vaults.remove(&vault_id).expect("Vault does not exist");
-
-        env::log(json!({
-            "type": U128(vault.balance),
-        }).to_string().as_bytes());
 
         if vault.balance > 0 {
             self.token.deposit(sender_id, vault.balance);
@@ -216,11 +202,7 @@ impl MintableFungibleTokenVault {
         vault.balance
     }
 
-    pub fn withdraw_from_vault(&mut self, vault_id: VaultId, receiver_id: &AccountId, amount: u128) {
-        env::log(json!({
-            "type": "Withdrawing money"
-        }).to_string().as_bytes());
-
+    pub fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: &AccountId, amount: u128) {
         let mut vault = self.vaults.get(&vault_id).expect("Vault does not exist");
         assert!(env::predecessor_account_id() == vault.receiver_id, "Access of vault denied");
         

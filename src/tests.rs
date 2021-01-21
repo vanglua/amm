@@ -33,10 +33,7 @@ use near_sdk_sim::{
 
 use crate::constants;
 use crate::math;
-use crate::pool_factory;
-use crate::pool_factory::PoolFactory;
-use pool_factory::PoolFactoryContract;
-
+use crate::flux_protocol::FluxProtocolContract;
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 
 /// Load in contract bytes
@@ -47,13 +44,14 @@ near_sdk_sim::lazy_static! {
 
 fn init(
     initial_balance: u128,
-    owner_id: String
-) -> (UserAccount, ContractAccount<PoolFactoryContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
+    owner_id: String,
+    gov_id: String,
+) -> (UserAccount, ContractAccount<FluxProtocolContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
     // deploy amm
     let amm_contract = deploy!(
         // Contract Proxy
-        contract: PoolFactoryContract,
+        contract: FluxProtocolContract,
         // Contract account id
         contract_id: "amm",
         // Bytes of contract
@@ -61,10 +59,8 @@ fn init(
         // User deploying the contract,
         signer_account: master_account,
         // init method
-        init_method: init(owner_id.to_string(), "token".to_string())
+        init_method: init(owner_id.to_string(), gov_id.to_string(), vec!["token".to_string()])
     );
-
-    
 
     let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
     let tx = token_contract.create_transaction(token_contract.account_id());
@@ -75,7 +71,6 @@ fn init(
         .submit();
 
     init_token(&token_contract, owner_id.to_string(), initial_balance);
-
     
     let alice = master_account.create_user("alice".to_string(), to_yocto("1000"));
     
@@ -111,7 +106,7 @@ fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     let args = json!({
         "account_id": account_id
     }).to_string().as_bytes().to_vec();
-    let res = tx.function_call("get_balance".into(), args, 100000000000000, 0).submit();
+    let res = tx.function_call("get_balance".into(), args, DEFAULT_GAS, 0).submit();
     let balance: U128 = res.unwrap_json();
     balance.into()
 }
@@ -121,7 +116,7 @@ fn register(token_account: &UserAccount, sender: &UserAccount, to_register: &Acc
     let args = json!({
         "account_id": to_register
     }).to_string().as_bytes().to_vec();
-    let res = tx.function_call("register_account".into(), args, 100000000000000, REGISTRY_STORAGE).submit();
+    let res = tx.function_call("register_account".into(), args, DEFAULT_GAS, REGISTRY_STORAGE).submit();
     if !res.is_ok() {
         panic!("ERR_REGISTER_FAILED: {:?}", res);
     }
@@ -134,7 +129,7 @@ fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountI
         "amount": U128(amt)
     }).to_string().as_bytes().to_vec();
 
-    let res = tx.function_call("transfer".into(), args, 100000000000000, 0).submit();
+    let res = tx.function_call("transfer".into(), args, DEFAULT_GAS, 0).submit();
     if !res.is_ok() {
         panic!("ERR_TRANSFER_FAILED: {:?}", res);
     }
@@ -148,11 +143,37 @@ fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: Acco
         "payload": payload
     }).to_string().as_bytes().to_vec();
     
-    let res = tx.function_call("transfer_with_vault".into(), args, 100000000000000, STORAGE_AMOUNT).submit();
+    let res = tx.function_call("transfer_with_vault".into(), args, DEFAULT_GAS, STORAGE_AMOUNT).submit();
     if !res.is_ok() {
         panic!("tx failed: {:?}", res);
     }
     res
+}
+
+fn empty_string() -> String { "".to_string() }
+
+fn empty_string_vec(len: u16) -> Vec<String> { 
+    let mut tags: Vec<String> = vec![];
+    for i in 0..len {
+        tags.push(empty_string());
+    }
+    
+    tags
+}
+
+fn env_time() -> U64{ 
+    1609951265967.into()
+}
+fn fee() -> U128 {
+    (10_u128.pow(18) / 50).into() // 2%
+}
+
+fn create_market(creator: &UserAccount, amm: &ContractAccount<FluxProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
+    call!(
+        creator,
+        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
+        deposit = STORAGE_AMOUNT
+    ).unwrap_json()
 }
 
 fn to_token_denom(amt: u128) -> u128 {
@@ -191,10 +212,10 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 }
 
 // runtime tests
-
 mod init_tests;
 mod pool_initiation_tests;
 mod pricing_tests;
 mod swap_tests;
 mod liquidity_tests;
 mod fee_tests;
+mod market_end_tests;

@@ -3,7 +3,6 @@ use near_sdk::{
         U128, 
         U64
     },
-    AccountId,
     serde_json,
     serde_json::Value,
 };
@@ -24,25 +23,25 @@ pub struct InitStruct {
 
 #[derive(Serialize, Deserialize)]
 pub struct SeedPool {
-    pub pool_id: U64,
+    pub market_id: U64,
     pub denorm_weights: Vec<U128>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct LPPool {
-    pub pool_id: U64,
+    pub market_id: U64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Buy {
-    pub pool_id: U64,
+    pub market_id: U64,
     pub outcome_target: u16,
     pub min_shares_out: U128
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Sell  {
-    pub pool_id: U64,
+    pub market_id: U64,
     pub outcome_target: u16,
     pub max_shares_in: U128
 }

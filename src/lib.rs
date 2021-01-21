@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::pedantic)]
-#![allow(dead_code, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
+#![allow(dead_code, clippy::too_many_lines, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
 #[cfg(feature = "wee_alloc")]
 
 #[global_allocator]
@@ -14,6 +14,7 @@ construct_uint! {
 
 #[macro_use]
 /** core */
+mod flux_protocol;
 mod payload_structs;
 mod pool_factory;
 mod pool;

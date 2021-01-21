@@ -11,6 +11,8 @@ crate-type = ["cdylib", "rlib"]
 near-sdk = { git = "https://github.com/near/near-sdk-rs.git", tag="2.2.0" }
 uint = { version = "0.8.5", default-features = false }
 serde = "1.0.118"
+
+
 [profile.release]
 codegen-units = 1
 overflow-checks = true
