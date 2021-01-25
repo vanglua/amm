@@ -157,7 +157,8 @@ pub fn log_market(
     market: &Market,
     description: String,  
     extra_info: String,  
-    outcome_tags: Vec<String>
+    outcome_tags: Vec<String>,
+    categories: Vec<String>,
 ) {
 	env::log(
 		json!({
@@ -172,6 +173,7 @@ pub fn log_market(
                 "end_time": U64(market.end_time),
                 "finalized": market.finalized,
                 "payout_numerator": market.payout_numerator,
+                "categories": categories,
 			}
 		})
 		.to_string()
