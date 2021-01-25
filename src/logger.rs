@@ -107,13 +107,14 @@ fn log_swap(pool: &Pool, account_id: &AccountId, outcome: u16, input: u128, outp
 		json!({
 			"type": "swaps".to_string(),
 			"params": {
-                "pool_id": pool.id,
+                "pool_id": U64(pool.id),
                 "block_height": U64(env::block_index()),
                 "account_id": account_id,
                 "outcome_id": outcome,
                 "input": U128(input),
                 "output": U128(output),
                 "fee": U128(fee),
+                "collateral_token_id": pool.collateral_token_id,
                 "type": swap_type_str,
 			}
 		})
