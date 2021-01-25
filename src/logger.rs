@@ -135,7 +135,6 @@ pub fn log_user_balance(token: &MintableToken, account_id: &AccountId, new_balan
 		json!({
             "type": "user_balances".to_string(),
             "cap_id": format!("ub_{}_{}_{}", account_id, token.pool_id, token.outcome_id),
-            "action": "update",
 			"params": {
                 "id": format!("ub_{}_{}_{}", account_id, token.pool_id, token.outcome_id),
                 "pool_id": U64(token.pool_id),
@@ -165,7 +164,7 @@ pub fn log_market(
             "action": "update",
             "cap_id": format!("m_{}", market.pool.id),
 			"params": {
-                "id": market.pool.id,
+                "id": U64(market.pool.id),
                 "description": description,
                 "extra_info": extra_info,
                 "outcome_tags": outcome_tags,
