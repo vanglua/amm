@@ -168,7 +168,7 @@ fn fee() -> U128 {
 fn create_market(creator: &UserAccount, amm: &ContractAccount<FluxProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
     call!(
         creator,
-        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
+        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
         deposit = STORAGE_AMOUNT
     ).unwrap_json()
 }

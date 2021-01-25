@@ -147,6 +147,7 @@ impl FluxProtocol {
         extra_info: String,
         outcomes: u16,
         outcome_tags: Vec<String>,
+        categories: Vec<String>,
         end_time: U64,
         collateral_token_id: AccountId,
         swap_fee: U128,
@@ -177,7 +178,7 @@ impl FluxProtocol {
             finalized: false
         };
         
-        logger::log_market(&market, description, extra_info, outcome_tags);
+        logger::log_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
         
         self.markets.insert(&market_id, &market);
