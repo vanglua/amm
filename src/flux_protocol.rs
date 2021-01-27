@@ -355,6 +355,7 @@ impl FluxProtocol {
             Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
             None => ()
         };
+                
         market.payout_numerator = payout_numerator;
         market.finalized = true;
         self.markets.insert(&market_id.0, &market);
