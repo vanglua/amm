@@ -107,13 +107,14 @@ fn log_swap(pool: &Pool, account_id: &AccountId, outcome: u16, input: u128, outp
 		json!({
 			"type": "swaps".to_string(),
 			"params": {
-                "pool_id": pool.id,
+                "pool_id": U64(pool.id),
                 "block_height": U64(env::block_index()),
                 "account_id": account_id,
                 "outcome_id": outcome,
                 "input": U128(input),
                 "output": U128(output),
                 "fee": U128(fee),
+                "collateral_token_id": pool.collateral_token_id,
                 "type": swap_type_str,
 			}
 		})
@@ -156,7 +157,8 @@ pub fn log_market(
     market: &Market,
     description: String,  
     extra_info: String,  
-    outcome_tags: Vec<String>
+    outcome_tags: Vec<String>,
+    categories: Vec<String>,
 ) {
 	env::log(
 		json!({
@@ -171,6 +173,7 @@ pub fn log_market(
                 "end_time": U64(market.end_time),
                 "finalized": market.finalized,
                 "payout_numerator": market.payout_numerator,
+                "categories": categories,
 			}
 		})
 		.to_string()
