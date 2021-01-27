@@ -55,8 +55,10 @@ fn init(
         bytes: &AMM_WASM_BYTES,
         // User deploying the contract,
         signer_account: master_account,
+        deposit: to_yocto("1000"),
         // init method
         init_method: init(owner_id.to_string(), gov_id.to_string(), vec!["token".to_string()])
+
     );
 
     let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));

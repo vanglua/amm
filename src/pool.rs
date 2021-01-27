@@ -120,6 +120,7 @@ impl Pool {
         weight_indication: &Vec<u128>
     ) {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
+        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_INVALID_SEED_AMOUNT");
         assert!(!self.public, "ERR_POOL_PUBLIC");
         assert!(weight_indication.len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
         
@@ -453,6 +454,7 @@ impl Pool {
         let shares_in = self.calc_sell_collateral_out(amount_out, outcome_target);
         assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
         let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
+
         let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCE");
         let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
 
@@ -483,7 +485,10 @@ impl Pool {
 
                 escrow_amt
             },
-            Ordering::Equal => 0
+            Ordering::Equal => {
+                account.entries.insert(&outcome_target, &(spent - (amount_out) - fee));
+                0
+            }
         };
 
         let tokens_to_burn = amount_out + fee;

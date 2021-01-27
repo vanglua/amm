@@ -33,7 +33,6 @@ const TOKEN_DENOM: u128 = 1_000_000_000_000_000_000; // 1e18
 const MAX_FEE: u128 = TOKEN_DENOM / 20; // max fee is 5%
 const MIN_FEE: u128 = TOKEN_DENOM / 10_000; // max fee is %0.01
 
-// TODO: Move description, extra_info, outcome_tags to just be logged during indexing
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {
     pub end_time: u64,
@@ -386,16 +385,6 @@ impl FluxProtocol {
         self.assert_gov();
         self.token_whitelist.push(to_add);
     }
-
-    // Could be done with swap_remove but since that replaces with popped element i feel like it's data layer error sensitive
-    pub fn new_whitelist(
-        &mut self,
-        token_whitelist: Vec<AccountId>
-    ) {
-        self.assert_gov();
-        self.token_whitelist = token_whitelist;
-    }
-
 }
 
 impl FluxProtocol {
