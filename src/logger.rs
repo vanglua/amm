@@ -242,3 +242,21 @@ pub fn log_claim_earnings(
 		.as_bytes()
 	);
 }
+
+pub fn log_withdrawn_fees(pool_token: &MintableToken, account_id: &AccountId, withdrawn_amount: u128) {
+    env::log(
+		json!({
+			"type": "withdrawn_fees".to_string(),
+			"params": {
+                "id": format!("wf_{}_{}_{}", pool_token.pool_id, pool_token.outcome_id, account_id),
+                "pool_id": U64(pool_token.pool_id),
+                "outcome_id": pool_token.outcome_id,
+                "account_id": account_id,
+                "withdrawn_amount": U128(withdrawn_amount),
+                "block_height": U64(env::block_index()),
+			}
+		})
+		.to_string()
+		.as_bytes()
+	);
+}

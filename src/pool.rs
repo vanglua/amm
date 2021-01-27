@@ -221,6 +221,9 @@ impl Pool {
         fees
     }
 
+    // before token transfer
+    // withdraw fees
+
     fn get_and_clear_balances(
         &mut self,
         account_id: &AccountId
@@ -292,6 +295,9 @@ impl Pool {
         if let Some(account_id) = from {
             let withdrawn_fees = self.withdrawn_fees.get(account_id).expect("ERR_NO_BAL");
             self.withdrawn_fees.insert(account_id, &(withdrawn_fees - ineligible_fee_amount));
+
+            logger::log_withdrawn_fees(&self.pool_token.token, account_id, withdrawn_fees - ineligible_fee_amount);
+            
             self.total_withdrawn_fees -= ineligible_fee_amount;
         } else { // On mint
             self.fee_pool_weight += ineligible_fee_amount;
@@ -301,6 +307,9 @@ impl Pool {
         if let Some(account_id) = to { 
             let withdrawn_fees = self.withdrawn_fees.get(account_id).unwrap_or(0);
             self.withdrawn_fees.insert(account_id, &(withdrawn_fees + ineligible_fee_amount));
+
+            logger::log_withdrawn_fees(&self.pool_token.token, account_id, withdrawn_fees + ineligible_fee_amount);
+
             self.total_withdrawn_fees += ineligible_fee_amount;
         } else { // On burn
             self.fee_pool_weight -= ineligible_fee_amount;
@@ -329,6 +338,7 @@ impl Pool {
         if withdrawable_amount > 0 {
             self.withdrawn_fees.insert(account_id, &raw_amount);
             self.total_withdrawn_fees += withdrawable_amount;
+            logger::log_withdrawn_fees(&self.pool_token.token, account_id, raw_amount);
         }
 
         withdrawable_amount

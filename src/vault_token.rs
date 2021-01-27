@@ -123,7 +123,7 @@ impl MintableToken {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct MintableFungibleTokenVault {
-    token: MintableToken,
+    pub token: MintableToken,
     vaults: LookupMap<u64, Vault>,
     next_vault_id: u64,
 }
