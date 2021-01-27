@@ -120,7 +120,7 @@ impl Pool {
         weight_indication: &Vec<u128>
     ) {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
-        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_INVALID_SEED_AMOUNT");
+        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_MIN_SEED_AMOUNT");
         assert!(!self.public, "ERR_POOL_PUBLIC");
         assert!(weight_indication.len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
         
@@ -161,6 +161,7 @@ impl Pool {
         total_in: u128
     ) {
         assert!(self.public, "ERR_NOT_PUBLIC");
+        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_MIN_JOIN_AMOUNT");
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
         let pool_balances = self.get_pool_balances();
         let max_balance = pool_balances.iter().max().unwrap();
