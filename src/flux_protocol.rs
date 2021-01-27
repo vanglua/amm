@@ -33,7 +33,6 @@ const TOKEN_DENOM: u128 = 1_000_000_000_000_000_000; // 1e18
 const MAX_FEE: u128 = TOKEN_DENOM / 20; // max fee is 5%
 const MIN_FEE: u128 = TOKEN_DENOM / 10_000; // max fee is %0.01
 
-// TODO: Move description, extra_info, outcome_tags to just be logged during indexing
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {
     pub end_time: u64,
@@ -147,6 +146,7 @@ impl FluxProtocol {
         extra_info: String,
         outcomes: u16,
         outcome_tags: Vec<String>,
+        categories: Vec<String>,
         end_time: U64,
         collateral_token_id: AccountId,
         swap_fee: U128,
@@ -154,6 +154,7 @@ impl FluxProtocol {
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.id;
+        assert!(self.token_whitelist.contains(&collateral_token_id), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
         assert!(end_time > self.ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
         assert!(swap_fee == 0 || (swap_fee <= MAX_FEE && swap_fee >= MIN_FEE), "ERR_INVALID_FEE");
@@ -176,7 +177,7 @@ impl FluxProtocol {
             finalized: false
         };
         
-        logger::log_market(&market, description, extra_info, outcome_tags);
+        logger::log_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
         
         self.markets.insert(&market_id, &market);
@@ -371,6 +372,14 @@ impl FluxProtocol {
         self.gov = new_gov;
     }
 
+    pub fn set_token_whitelist(
+        &mut self,
+        whitelist: Vec<AccountId>
+    ) {
+        self.assert_gov();
+        self.token_whitelist = whitelist;
+    }
+
     pub fn add_to_token_whitelist(
         &mut self,
         to_add: AccountId
@@ -378,16 +387,6 @@ impl FluxProtocol {
         self.assert_gov();
         self.token_whitelist.push(to_add);
     }
-
-    // Could be done with swap_remove but since that replaces with popped element i feel like it's data layer error sensitive
-    pub fn new_whitelist(
-        &mut self,
-        token_whitelist: Vec<AccountId>
-    ) {
-        self.assert_gov();
-        self.token_whitelist = token_whitelist;
-    }
-
 }
 
 impl FluxProtocol {

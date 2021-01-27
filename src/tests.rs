@@ -2,9 +2,6 @@
 
 use near_sdk::{
     AccountId,
-    VMContext, 
-    testing_env,
-    MockedBlockchain, 
     json_types::{
         U64,
         U128
@@ -58,8 +55,10 @@ fn init(
         bytes: &AMM_WASM_BYTES,
         // User deploying the contract,
         signer_account: master_account,
+        deposit: to_yocto("1000"),
         // init method
         init_method: init(owner_id.to_string(), gov_id.to_string(), vec!["token".to_string()])
+
     );
 
     let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
@@ -171,7 +170,7 @@ fn fee() -> U128 {
 fn create_market(creator: &UserAccount, amm: &ContractAccount<FluxProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
     call!(
         creator,
-        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
+        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
         deposit = STORAGE_AMOUNT
     ).unwrap_json()
 }
