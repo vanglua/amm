@@ -18,7 +18,7 @@ mod flux_protocol;
 mod payload_structs;
 mod pool_factory;
 mod pool;
-mod vault_token;
+mod outcome_token;
 
 /** utils */
 mod math;

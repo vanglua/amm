@@ -10,7 +10,7 @@ use near_sdk::{
 
 use crate::flux_protocol::{ Market };
 use crate::pool::{ Pool };
-use crate::vault_token::{ MintableToken };
+use crate::outcome_token::{ MintableToken };
 
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {

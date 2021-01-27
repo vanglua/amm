@@ -180,7 +180,7 @@ fn to_token_denom(amt: u128) -> u128 {
 }
 
 fn swap_fee() -> U128 {
-    U128(to_token_denom(3) / 1000)
+    U128(to_token_denom(2) / 100)
 }
 
 fn product_of(nums: &Vec<U128>) -> u128 {

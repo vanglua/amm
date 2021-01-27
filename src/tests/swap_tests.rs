@@ -238,10 +238,8 @@ fn complex_buy_test() {
     assert_eq!(U128(expected_pool_target_balance), target_pool_balance);
 }
 
-
-// TODO:test sale escrow
 #[test]
-fn complex_sell_test() {
+fn multi_sell_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
     
@@ -319,14 +317,152 @@ fn complex_sell_test() {
         amm.sell(market_id, U128(to_token_denom(9115) / 10000), 0, U128(buy_amt * 25 / 10)),
         deposit = STORAGE_AMOUNT
     );
-
     // Check balances with escrow both ways
     // Get updated balances
     let trader1_final_balance = get_balance(&token, trader1.account_id());
     let trader2_final_balance = get_balance(&token, trader2.account_id());
-
     // Assert balances
     assert!(trader1_init_balance - trader1_final_balance < precision);
     assert!(trader2_final_balance - expected_trader2_final_balance < precision);
+}
+
+
+#[test]
+fn complex_sell_with_fee_test() {
+    // Get accounts
+    let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+
+    let precision = to_token_denom(1) / 100; // 1 token_cent precision
+
+    // Fund accounts
+    transfer_unsafe(&token, &lp, trader1.account_id(), to_token_denom(10));
+    transfer_unsafe(&token, &lp, trader2.account_id(), to_token_denom(10));
+
+    // Get initial balances
+    let trader1_init_balance = get_balance(&token, trader1.account_id());
+    
+    let expected_trader1_share_bal = 1_872_531_876_138_433_515;
+    
+    // Seed / trade parameters
+    let target_price = U128(to_token_denom(5) / 10);
+    let seed_amt = to_token_denom(10);
+    let buy_amt = to_token_denom(1);
+    let weights = calc_weights_from_price(vec![target_price, target_price]);
+
+    // Create market
+    let market_id = create_market(&lp, &amm, 2, Some(swap_fee()));
+    
+    // Seed market
+    call!(
+        lp,
+        amm.seed_pool(market_id, U128(seed_amt), weights),
+        deposit = STORAGE_AMOUNT
+    );
+
+    // Publish market
+    let publish_args = json!({
+        "function": "publish",
+        "args": {
+            "market_id": market_id
+        }
+    }).to_string();
+    transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
+
+    let amm_final_balance = get_balance(&token, "amm".to_string());
+    assert_eq!(amm_final_balance, seed_amt);
+
+    // buy 0 from trader 1
+    let buy_a_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(to_token_denom(8) / 10)
+        }
+    }).to_string();
+    
+    transfer_with_vault(&token, &trader1, "amm".to_string(), buy_amt, buy_a_args.to_string());
+
+    let trader1_share_balance: U128 = view!(amm.get_share_balance(&trader1.account_id(), market_id, 0)).unwrap_json();
+    assert_eq!(trader1_share_balance, U128(expected_trader1_share_bal));
+
+
+    // Sell back from trader 1 and trader 2 
+    let sell_res_trader1 = call!(
+        trader1,
+        amm.sell(market_id, U128(959159302164807332), 0, U128(buy_amt * 25 / 10)),
+        deposit = STORAGE_AMOUNT
+    );
+
+}
+
+// TODO: ERR_NO_ENTRIES bug after seeding with uneven odds
+// TODO: Deploy with franklins changes
+#[test]
+fn selling_uneven_odds_test() {
+    // Get accounts
+    let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+
+    let precision = to_token_denom(1) / 100; // 1 token_cent precision
+
+    // Fund accounts
+    transfer_unsafe(&token, &lp, trader1.account_id(), to_token_denom(10));
+    transfer_unsafe(&token, &lp, trader2.account_id(), to_token_denom(10));
+
+    // Get initial balances
+    let trader1_init_balance = get_balance(&token, trader1.account_id());
+    
+    let expected_trader1_share_bal = 1_872_531_876_138_433_515;
+    
+    // Seed / trade parameters
+    let target_price = U128(to_token_denom(5) / 10);
+    let seed_amt = to_token_denom(10);
+    let buy_amt = to_token_denom(1);
+    let weights = calc_weights_from_price(vec![target_price, target_price]);
+
+    // Create market
+    let market_id = create_market(&lp, &amm, 2, Some(swap_fee()));
+    
+    // Seed market
+    call!(
+        lp,
+        amm.seed_pool(market_id, U128(seed_amt), weights),
+        deposit = STORAGE_AMOUNT
+    );
+
+    // Publish market
+    let publish_args = json!({
+        "function": "publish",
+        "args": {
+            "market_id": market_id
+        }
+    }).to_string();
+    transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
+
+    let amm_final_balance = get_balance(&token, "amm".to_string());
+    assert_eq!(amm_final_balance, seed_amt);
+
+    // buy 0 from trader 1
+    let buy_a_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(to_token_denom(8) / 10)
+        }
+    }).to_string();
+    
+    transfer_with_vault(&token, &trader1, "amm".to_string(), buy_amt, buy_a_args.to_string());
+
+    let trader1_share_balance: U128 = view!(amm.get_share_balance(&trader1.account_id(), market_id, 0)).unwrap_json();
+    assert_eq!(trader1_share_balance, U128(expected_trader1_share_bal));
+
+
+    // Sell back from trader 1 and trader 2 
+    let sell_res_trader1 = call!(
+        trader1,
+        amm.sell(market_id, U128(959159302164807332), 0, U128(buy_amt * 25 / 10)),
+        deposit = STORAGE_AMOUNT
+    );
 
 }

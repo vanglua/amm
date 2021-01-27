@@ -18,7 +18,7 @@ use crate::math;
 use crate::constants;
 use crate::logger;
 
-use crate::vault_token::MintableFungibleTokenVault;
+use crate::outcome_token::MintableFungibleToken;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct ResolutionEscrow {
@@ -53,8 +53,8 @@ pub struct Pool {
     pub owner: AccountId,
     pub collateral_token_id: AccountId,
     pub outcomes: u16,
-    pub outcome_tokens: UnorderedMap<u16, MintableFungibleTokenVault>,
-    pub pool_token: MintableFungibleTokenVault,
+    pub outcome_tokens: UnorderedMap<u16, MintableFungibleToken>,
+    pub pool_token: MintableFungibleToken,
     pub swap_fee: u128,
     pub withdrawn_fees: LookupMap<AccountId, u128>,
     pub total_withdrawn_fees: u128,
@@ -81,7 +81,7 @@ impl Pool {
             collateral_token_id,
             outcomes,
             outcome_tokens: UnorderedMap::new(format!("pool_:{}:outcome_tokens", pool_id).as_bytes().to_vec()),
-            pool_token: MintableFungibleTokenVault::new(pool_id, outcomes, 0, 0),
+            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0, 0),
             swap_fee,
             withdrawn_fees: LookupMap::new(format!("pool:{}:withdrawn_fees", pool_id).as_bytes().to_vec()),
             total_withdrawn_fees: 0,
@@ -211,7 +211,7 @@ impl Pool {
             let relative_spend = collateral_val_out / self.outcomes as u128;
             account.entries.insert(&outcome, &(current_spend + relative_spend));
             let mut token = self.outcome_tokens.get(&outcome).unwrap();
-            token.safe_transfer_from_internal(&env::current_account_id(), sender, send_out);
+            token.safe_transfer_internal(&env::current_account_id(), sender, send_out);
             self.outcome_tokens.insert(&outcome, &token);
         }
 
@@ -240,12 +240,12 @@ impl Pool {
             let outcome = i as u16;
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleTokenVault::new(self.id, outcome as u16, self.seed_nonce, 0) });
+            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, self.seed_nonce, 0) });
             
             outcome_token.mint(& env::current_account_id(), total_in);
 
             if *amount > 0 { 
-                outcome_token.safe_transfer_from_internal(&env::current_account_id(), sender, *amount);
+                outcome_token.safe_transfer_internal(&env::current_account_id(), sender, *amount);
             }
 
             self.outcome_tokens.insert(&(outcome as u16), &outcome_token);
@@ -435,7 +435,7 @@ impl Pool {
         self.add_to_pools(tokens_to_mint);
 
         let mut token_out = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
-        token_out.safe_transfer_from_internal(&env::current_account_id(), sender, shares_out);
+        token_out.safe_transfer_internal(&env::current_account_id(), sender, shares_out);
         self.outcome_tokens.insert(&outcome_target, &token_out);
         self.accounts.insert(sender, &account);
 
@@ -460,12 +460,13 @@ impl Pool {
         let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
 
         let avg_price = math::div_u128(spent, token_in.get_balance(sender));
-        let sell_price = math::div_u128(amount_out, shares_in);
         
-        token_in.transfer_no_vault(&env::current_account_id(), shares_in);
+        
+        token_in.transfer(&env::current_account_id(), shares_in);
         self.outcome_tokens.insert(&outcome_target, &token_in);
-
+        
         let fee = math::mul_u128(amount_out, self.swap_fee);
+        let sell_price = math::div_u128(amount_out + fee, shares_in);
         self.fee_pool_weight += fee;
         
         let to_escrow = match (sell_price).cmp(&avg_price) {
