@@ -251,9 +251,9 @@ impl Pool {
 
             // Calculate the amount of money spent by the users on the transfered shares
             let spend_on_outcome = total_in / self.outcomes as u128;
-            let relative_amount_out = math::div_u128(*amount, total_in);
-            let spent_on_amount_out = math::mul_u128(relative_amount_out, spend_on_outcome);
-            env::log(format!("spent on amount out: {}", spent_on_amount_out).as_bytes());
+            env::log(format!("spend on outcome: {}", spend_on_outcome).as_bytes());
+            let spent_on_amount_out = math::div_u128(math::mul_u128(*amount, spend_on_outcome), total_in);
+            env::log(format!("spend on amount out: {}", spent_on_amount_out).as_bytes());
 
             // Delta needs to be used spent on outcome shares for outcome in exit pool 
             let lp_entry_amount = spend_on_outcome - spent_on_amount_out;
@@ -477,21 +477,24 @@ impl Pool {
         assert!(self.public, "ERR_NOT_PUBLIC");
         assert!(outcome_target < self.outcomes, "ERR_INVALID_OUTCOME");
         let shares_in = self.calc_sell_collateral_out(amount_out, outcome_target);
-        env::log(format!("in {}  max in {}", shares_in, max_shares_in).as_bytes());
         assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
         let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
-
+        
         let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCE");
         let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
-
+        
         let avg_price = math::div_u128(spent, token_in.get_balance(sender));
+        let fee = math::mul_u128(amount_out, self.swap_fee);
+        let sell_price = math::div_u128(amount_out, shares_in);
+
+        // TODO: double check
+        env::log(format!("sell price {}  avg price {}", spent, amount_out).as_bytes());
+        env::log(format!("sell price {}  avg price {}, are eq: {}", sell_price, avg_price, sell_price == avg_price).as_bytes());
+        env::log(format!("shares in: {}  balance {},", shares_in, token_in.get_balance(sender)).as_bytes());
         
         token_in.transfer(&env::current_account_id(), shares_in);
         self.outcome_tokens.insert(&outcome_target, &token_in);
         
-        let fee = math::mul_u128(amount_out, self.swap_fee);
-        let sell_price = math::div_u128(amount_out + fee, shares_in);
-
         self.fee_pool_weight += fee;
         
         let to_escrow = match (sell_price).cmp(&avg_price) {
@@ -508,6 +511,7 @@ impl Pool {
                 let escrow_amt = math::mul_u128(price_delta, shares_in);
                 account.resolution_escrow.valid += escrow_amt;
                 logger::log_to_valid_escrow(self.id, &sender, escrow_amt);
+                env::log(format!("spent: {}  balance {},", shares_in, token_in.get_balance(sender)).as_bytes());
                 account.entries.insert(&outcome_target, &(spent - (amount_out - escrow_amt) - fee));
 
                 escrow_amt

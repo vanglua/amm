@@ -402,18 +402,21 @@ fn selling_uneven_odds_test() {
 
     // Seed / trade parameters
     let seed_amt = to_token_denom(10);
-    let shares_to_sell = 3_342_414_373_536_299_767;
+    let amount_out_expected = 838_054_961_715_504_818;
+    let balance_after_seed = 3_333_333_333_333_333_333;
     let weights = vec![U128(12_000_000_000), U128(12_000_000_000), U128(18_000_000_000), U128(18_000_000_000)];
 
     // Create market
     let market_id = create_market(&lp, &amm, 4, Some(swap_fee()));
     
     // Seed market
-    call!(
+    let seed_res = call!(
         lp,
         amm.seed_pool(market_id, U128(seed_amt), weights),
         deposit = STORAGE_AMOUNT
     );
+
+    println!("seed result: {:?}", seed_res);
 
     // Publish market
     let publish_args = json!({
@@ -431,7 +434,7 @@ fn selling_uneven_odds_test() {
 
     let sell_res_lp = call!(
         lp,
-        amm.sell(market_id, U128(to_token_denom(83) / 100), 0, U128(shares_to_sell)),
+        amm.sell(market_id, U128(amount_out_expected), 0, U128(balance_after_seed)),
         deposit = STORAGE_AMOUNT
     );
 

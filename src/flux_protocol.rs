@@ -247,6 +247,7 @@ impl FluxProtocol {
         }
     }
 
+    // TODO: return promise
     #[payable]
     pub fn sell(
         &mut self, 
@@ -254,7 +255,8 @@ impl FluxProtocol {
         collateral_out: U128, 
         outcome_target: u16,
         max_shares_in: U128
-    ) -> Promise {
+    // ) -> Promise {
+    ) {
         let initial_storage = env::storage_usage();
         let collateral_out: u128 = collateral_out.into();
         let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
@@ -276,7 +278,7 @@ impl FluxProtocol {
             &market.pool.collateral_token_id,
             0,
             GAS_BASE_COMPUTE
-        )
+        );
     }
 
     #[payable]
