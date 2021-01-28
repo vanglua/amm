@@ -27,17 +27,24 @@ pub struct ResolutionEscrow {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+pub struct LPEntries {
+    entries: LookupMap<u64, u128>
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    in_pool: u128,
     entries: LookupMap<u16, u128>, // Stores outcome => spend
+    lp_entries: LookupMap<u16, u128>,
     resolution_escrow: ResolutionEscrow
 }
+
+
 
 impl Account {
     pub fn new(pool_id: u64, sender: &AccountId) -> Self {
         Account {
-            in_pool: 0,
             entries: LookupMap::new(format!("pool:{}:account:{}", pool_id, sender).as_bytes().to_vec()),
+            lp_entries: LookupMap::new(format!("pool:{}:lp:{}", pool_id, sender).as_bytes().to_vec()),
             resolution_escrow: ResolutionEscrow {
                 valid: 0,
                 invalid: 0
@@ -52,6 +59,7 @@ pub struct Pool {
     pub seed_nonce: u64,
     pub owner: AccountId,
     pub collateral_token_id: AccountId,
+    pub lp_entries: LookupMap<AccountId, LPEntries>,
     pub outcomes: u16,
     pub outcome_tokens: UnorderedMap<u16, MintableFungibleToken>,
     pub pool_token: MintableFungibleToken,
@@ -79,6 +87,7 @@ impl Pool {
             seed_nonce: 1,
             owner: sender,
             collateral_token_id,
+            lp_entries: LookupMap::new(format!("pool:{}:lp_entries", pool_id).as_bytes().to_vec()),
             outcomes,
             outcome_tokens: UnorderedMap::new(format!("pool_:{}:outcome_tokens", pool_id).as_bytes().to_vec()),
             pool_token: MintableFungibleToken::new(pool_id, outcomes, 0, 0),
@@ -137,7 +146,8 @@ impl Pool {
         if pool_token_supply > 0 {
             self.outcome_tokens.clear();
             self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
-        } 
+        }
+
 
         self.mint_and_transfer_outcome_tokens(
             sender, 
@@ -164,11 +174,11 @@ impl Pool {
         assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_MIN_JOIN_AMOUNT");
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
         let pool_balances = self.get_pool_balances();
-        let max_balance = pool_balances.iter().max().unwrap();
+        let max_balance = pool_balances.iter().max().unwrap(); // max_balance = cheapest outcome
         let pool_supply = self.pool_token.total_supply();
 
         for (i, balance) in pool_balances.iter().enumerate() {
-            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_balance);
+            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_balance); // remaining = amt_in * balance / max_balance 
             outcome_tokens_to_return.insert(i, total_in - remaining);
         }
 
@@ -181,14 +191,11 @@ impl Pool {
         let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance);
         self.mint_internal(sender, to_mint);
 
-        let mut account = self.accounts.get(sender).unwrap_or_else(||Account::new(self.id, sender));
-        account.in_pool += total_in;
-        self.accounts.insert(sender, &account);
-
         logger::log_pool(&self);
         logger::log_user_pool_status(&self, &env::predecessor_account_id(), total_in);
     }
 
+    // TODO: double check account.entries logic
     pub fn exit_pool(
         &mut self,
         sender: &AccountId,
@@ -200,16 +207,17 @@ impl Pool {
         let sender_pool_token_balance = self.pool_token.get_balance(sender);
 
         let mut account = self.accounts.get(sender).expect("ERR_NO_ACCOUNT");
-        let collateral_val_out = math::div_u128(math::mul_u128(account.in_pool, total_in), sender_pool_token_balance);
-        account.in_pool -= collateral_val_out;
+        let lp_token_exit_ratio = math::div_u128(total_in, sender_pool_token_balance);
 
         for (i, balance) in balances.iter().enumerate() {
             let outcome = i as u16;
             let send_out = math::div_u128(math::mul_u128(*balance, total_in), pool_token_supply);
             let current_spend = account.entries.get(&outcome).unwrap_or(0);
 
-            let relative_spend = collateral_val_out / self.outcomes as u128;
-            account.entries.insert(&outcome, &(current_spend + relative_spend));
+            let account_total_spent_on_outcome = account.lp_entries.get(&outcome).unwrap_or(0);
+            let relative_spent = math::mul_u128(lp_token_exit_ratio, account_total_spent_on_outcome);
+            account.entries.insert(&outcome, &(current_spend + relative_spent));
+            
             let mut token = self.outcome_tokens.get(&outcome).unwrap();
             token.safe_transfer_internal(&env::current_account_id(), sender, send_out);
             self.outcome_tokens.insert(&outcome, &token);
@@ -236,8 +244,25 @@ impl Pool {
         total_in: u128,
         outcome_tokens_to_return: &Vec<u128>
     ) {
+        let mut account = self.accounts.get(sender).unwrap_or_else(||Account::new(self.id, sender));
+        
         for (i, amount) in outcome_tokens_to_return.iter().enumerate() {
             let outcome = i as u16;
+
+            // Calculate the amount of money spent by the users on the transfered shares
+            let spend_on_outcome = total_in / self.outcomes as u128;
+            let relative_amount_out = math::div_u128(*amount, total_in);
+            let spent_on_amount_out = math::mul_u128(relative_amount_out, spend_on_outcome);
+            env::log(format!("spent on amount out: {}", spent_on_amount_out).as_bytes());
+
+            // Delta needs to be used spent on outcome shares for outcome in exit pool 
+            let lp_entry_amount = spend_on_outcome - spent_on_amount_out;
+            let prev_spent = account.lp_entries.get(&outcome).unwrap_or(0);
+            account.lp_entries.insert(&outcome, &lp_entry_amount);
+
+            let prev_spent = account.entries.get(&outcome).unwrap_or(0);
+            account.entries.insert(&outcome, &(prev_spent + spent_on_amount_out));
+
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
             .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, self.seed_nonce, 0) });
@@ -248,8 +273,11 @@ impl Pool {
                 outcome_token.safe_transfer_internal(&env::current_account_id(), sender, *amount);
             }
 
+            self.accounts.insert(sender, &account);
             self.outcome_tokens.insert(&(outcome as u16), &outcome_token);
         }
+
+        self.accounts.insert(sender, &account);
     }
 
     fn mint_internal(
@@ -343,10 +371,6 @@ impl Pool {
         assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
         assert_eq!(self.outcome_tokens.len() as u16, self.outcomes, "ERR_NOT_BINDED");
         assert!(amount_in >= self.pool_token.total_supply(), "ERR_INSUFFICIENT_COLLATERAL");
-
-        let mut account = self.accounts.get(sender).unwrap_or_else(||Account::new(self.id, sender));
-        account.in_pool = self.pool_token.total_supply();
-        self.accounts.insert(sender, &account);
 
         self.public = true;
 
@@ -453,6 +477,7 @@ impl Pool {
         assert!(self.public, "ERR_NOT_PUBLIC");
         assert!(outcome_target < self.outcomes, "ERR_INVALID_OUTCOME");
         let shares_in = self.calc_sell_collateral_out(amount_out, outcome_target);
+        env::log(format!("in {}  max in {}", shares_in, max_shares_in).as_bytes());
         assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
         let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
 
@@ -461,18 +486,18 @@ impl Pool {
 
         let avg_price = math::div_u128(spent, token_in.get_balance(sender));
         
-        
         token_in.transfer(&env::current_account_id(), shares_in);
         self.outcome_tokens.insert(&outcome_target, &token_in);
         
         let fee = math::mul_u128(amount_out, self.swap_fee);
         let sell_price = math::div_u128(amount_out + fee, shares_in);
+
         self.fee_pool_weight += fee;
         
         let to_escrow = match (sell_price).cmp(&avg_price) {
             Ordering::Less => {
                 let price_delta = avg_price - sell_price;
-                let escrow_amt = math::mul_u128(price_delta, shares_in); // TODO: validate if fee should be subtracted at escrow
+                let escrow_amt = math::mul_u128(price_delta, shares_in);
                 account.resolution_escrow.invalid += escrow_amt;
                 logger::log_to_invalid_escrow(self.id, &sender, escrow_amt);
                 account.entries.insert(&outcome_target, &(spent - (amount_out + escrow_amt) - fee));
@@ -480,7 +505,7 @@ impl Pool {
             },
             Ordering::Greater => {
                 let price_delta = sell_price - avg_price;
-                let escrow_amt = math::mul_u128(price_delta, shares_in); // TODO: validate if fee should be subtracted at escrow
+                let escrow_amt = math::mul_u128(price_delta, shares_in);
                 account.resolution_escrow.valid += escrow_amt;
                 logger::log_to_valid_escrow(self.id, &sender, escrow_amt);
                 account.entries.insert(&outcome_target, &(spent - (amount_out - escrow_amt) - fee));

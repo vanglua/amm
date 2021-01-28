@@ -211,10 +211,10 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 }
 
 // runtime tests
-mod init_tests;
-mod pool_initiation_tests;
-mod pricing_tests;
+// mod init_tests;
+// mod pool_initiation_tests;
+// mod pricing_tests;
 mod swap_tests;
-mod liquidity_tests;
-mod fee_tests;
-mod market_end_tests;
+// mod liquidity_tests;
+// mod fee_tests;
+// mod market_end_tests;
