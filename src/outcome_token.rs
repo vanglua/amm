@@ -1,21 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use near_sdk::{
-    json_types::{
-        U128,
-    },
-    serde::{
-        Serialize,
-        Deserialize,
-    },
-    ext_contract,
     AccountId,
-    Gas,
     Balance,
     collections::{
 		LookupMap,
 	},
-    Promise,
     env,
     borsh::{
         self,
@@ -94,7 +84,7 @@ impl MintableToken {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct MintableFungibleToken {
-    token: MintableToken,
+    pub token: MintableToken,
 }
 
 impl Default for MintableFungibleToken {
