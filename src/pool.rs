@@ -144,10 +144,10 @@ impl Pool {
         let pool_token_supply = self.pool_token.total_supply();
 
         if pool_token_supply > 0 {
+            self.accounts.remove(sender);
             self.outcome_tokens.clear();
             self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
         }
-
 
         self.mint_and_transfer_outcome_tokens(
             sender, 
@@ -195,7 +195,6 @@ impl Pool {
         logger::log_user_pool_status(&self, &env::predecessor_account_id(), total_in);
     }
 
-    // TODO: double check account.entries logic
     pub fn exit_pool(
         &mut self,
         sender: &AccountId,
@@ -253,15 +252,13 @@ impl Pool {
             let outcome = i as u16;
 
             // Calculate the amount of money spent by the users on the transfered shares
-            let spend_on_outcome = total_in / self.outcomes as u128;
-            // env::log(format!("spend on outcome: {}", spend_on_outcome).as_bytes());
-            let spent_on_amount_out = math::div_u128(math::mul_u128(*amount, spend_on_outcome), total_in);
-            // env::log(format!("spend on amount out: {}", spent_on_amount_out).as_bytes());
-
+            let spent_on_outcome = total_in / self.outcomes as u128;
+            let spent_on_amount_out = math::mul_u128(spent_on_outcome, math::div_u128(*amount, total_in));
+    
             // Delta needs to be used spent on outcome shares for outcome in exit pool 
-            let lp_entry_amount = spend_on_outcome - spent_on_amount_out;
-            let prev_spent = account.lp_entries.get(&outcome).unwrap_or(0);
-            account.lp_entries.insert(&outcome, &lp_entry_amount);
+            let lp_entry_amount = spent_on_outcome - spent_on_amount_out;
+            let prev_lp_entries = account.lp_entries.get(&outcome).unwrap_or(0);
+            account.lp_entries.insert(&outcome, &(prev_lp_entries + lp_entry_amount));
 
             let prev_spent = account.entries.get(&outcome).unwrap_or(0);
             account.entries.insert(&outcome, &(prev_spent + spent_on_amount_out));
@@ -487,26 +484,22 @@ impl Pool {
         assert!(self.public, "ERR_NOT_PUBLIC");
         assert!(outcome_target < self.outcomes, "ERR_INVALID_OUTCOME");
         let shares_in = self.calc_sell_collateral_out(amount_out, outcome_target);
+
         assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
         let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
         
         let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCE");
         let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
         
-        let avg_price = math::div_u128(spent, token_in.get_balance(sender));
         let fee = math::mul_u128(amount_out, self.swap_fee);
+        let avg_price = math::div_u128(spent, token_in.get_balance(sender));
         let sell_price = math::div_u128(amount_out + fee, shares_in);
 
-        // TODO: double check
-        // env::log(format!("sell price {}  avg price {}", spent, amount_out).as_bytes());
-        // env::log(format!("sell price {}  avg price {}, are eq: {}", sell_price, avg_price, sell_price == avg_price).as_bytes());
-        // env::log(format!("shares in: {}  balance {},", shares_in, token_in.get_balance(sender)).as_bytes());
-        
         token_in.transfer(&env::current_account_id(), shares_in);
         self.outcome_tokens.insert(&outcome_target, &token_in);
         
         self.fee_pool_weight += fee;
-        
+
         let to_escrow = match (sell_price).cmp(&avg_price) {
             Ordering::Less => {
                 let price_delta = avg_price - sell_price;
@@ -520,10 +513,15 @@ impl Pool {
                 let price_delta = sell_price - avg_price;
                 let escrow_amt = math::mul_u128(price_delta, shares_in);
                 account.resolution_escrow.valid += escrow_amt;
-                // env::log(format!("spent {}", spent - (amount_out - escrow_amt) - fee).as_bytes());
                 logger::log_to_valid_escrow(self.id, &sender, escrow_amt);
-                account.entries.insert(&outcome_target, &(spent - (amount_out - escrow_amt) - fee));
+                let entries_to_sub = (amount_out - escrow_amt) - fee;
 
+                if entries_to_sub > spent {
+                    account.entries.insert(&outcome_target, &0);
+                } else {
+                    account.entries.insert(&outcome_target, &(spent - entries_to_sub));
+                }
+                
                 escrow_amt
             },
             Ordering::Equal => {
