@@ -566,7 +566,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flux-amm"
+name = "flux"
 version = "0.1.0"
 dependencies = [
  "near-sdk",
