@@ -11,10 +11,6 @@ use near_sdk::{
 
 use near_sdk_sim::{
     ExecutionResult,
-    transaction::{
-        ExecutionOutcome,
-        ExecutionStatus
-    },
     call, 
     deploy, 
     init_simulator, 
@@ -33,6 +29,13 @@ use crate::math;
 use crate::flux_protocol::FluxProtocolContract;
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 
+struct InitRes {
+    root: UserAccount,
+    amm_contract: ContractAccount<FluxProtocolContract>,
+    token_account: UserAccount,
+    user_accounts: Vec<UserAccount>
+}
+
 /// Load in contract bytes
 near_sdk_sim::lazy_static! {
     static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("../res/flux_amm.wasm").as_ref();
@@ -43,7 +46,7 @@ fn init(
     initial_balance: u128,
     owner_id: String,
     gov_id: String,
-) -> (UserAccount, ContractAccount<FluxProtocolContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
+) -> InitRes{
     let master_account = init_simulator(None);
     // deploy amm
     let amm_contract = deploy!(
@@ -61,26 +64,31 @@ fn init(
 
     );
 
-    let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
-    let tx = token_contract.create_transaction(token_contract.account_id());
+    let token_account = master_account.create_user("token".to_string(), to_yocto("100"));
+    let tx = token_account.create_transaction(token_account.account_id());
     // uses default values for deposit and gas
     let res = tx
         .transfer(to_yocto("1"))
         .deploy_contract((&TOKEN_WASM_BYTES).to_vec())
         .submit();
 
-    init_token(&token_contract, owner_id.to_string(), initial_balance);
+    init_token(&token_account, owner_id.to_string(), initial_balance);
     
     let alice = master_account.create_user("alice".to_string(), to_yocto("1000"));
     
-    register(&token_contract, &alice, &"amm".to_string());
+    register(&token_account, &alice, &"amm".to_string());
 
     let bob = master_account.create_user("bob".to_string(), to_yocto("100"));
-    register(&token_contract, &alice, &bob.account_id());
+    register(&token_account, &alice, &bob.account_id());
     let carol = master_account.create_user("carol".to_string(), to_yocto("100"));
-    register(&token_contract, &alice, &carol.account_id());
+    register(&token_account, &alice, &carol.account_id());
 
-    (master_account, amm_contract, token_contract, alice, bob, carol)
+    InitRes {
+        root: master_account,
+        amm_contract,
+        token_account,
+        user_accounts: vec![alice, bob, carol]
+    }
 }
 
 fn init_token(
@@ -211,10 +219,11 @@ fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
 }
 
 // runtime tests
-mod init_tests;
-mod pool_initiation_tests;
-mod pricing_tests;
-mod swap_tests;
-mod liquidity_tests;
-mod fee_tests;
-mod market_end_tests;
+// mod init_tests;
+// mod pool_initiation_tests;
+// mod pricing_tests;
+// mod swap_tests;
+// mod liquidity_tests;
+// mod fee_tests;
+// mod market_end_tests;
+mod generic_tests;
