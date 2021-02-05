@@ -8,7 +8,7 @@ use near_sdk::{
     serde_json::json
 };
 
-use crate::flux_protocol::{ Market };
+use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
 

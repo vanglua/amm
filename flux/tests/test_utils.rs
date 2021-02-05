@@ -11,44 +11,46 @@ use near_sdk::{
 
 use near_sdk_sim::{
     ExecutionResult,
-    transaction::{
-        ExecutionOutcome,
-        ExecutionStatus
-    },
     call, 
     deploy, 
     init_simulator, 
-    near_crypto::Signer, 
     to_yocto, 
-    view, 
     ContractAccount, 
     UserAccount, 
     STORAGE_AMOUNT,
-    DEFAULT_GAS,
-    account::AccessKey
+    DEFAULT_GAS
 };
 
-use crate::constants;
-use crate::math;
-use crate::flux_protocol::FluxProtocolContract;
+extern crate flux;
+pub use flux::*;
+use flux::protocol::ProtocolContract;
+
+
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 
-/// Load in contract bytes
-near_sdk_sim::lazy_static! {
-    static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("../res/flux_amm.wasm").as_ref();
-    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../res/vault_token_w_logs.wasm").as_ref();
+struct InitRes {
+    root: UserAccount,
+    amm_contract: ContractAccount<protocol::ProtocolContract>,
+    token_account: UserAccount,
+    user_accounts: Vec<UserAccount>
 }
 
-fn init(
+// Load in contract bytes
+near_sdk_sim::lazy_static! {
+    static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("./wasm/flux.wasm").as_ref();
+    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("./wasm/vault_token_w_logs.wasm").as_ref();
+}
+
+pub fn init(
     initial_balance: u128,
     owner_id: String,
     gov_id: String,
-) -> (UserAccount, ContractAccount<FluxProtocolContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
+) -> (UserAccount, ContractAccount<ProtocolContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
     // deploy amm
     let amm_contract = deploy!(
         // Contract Proxy
-        contract: FluxProtocolContract,
+        contract: ProtocolContract,
         // Contract account id
         contract_id: "amm",
         // Bytes of contract
@@ -83,7 +85,8 @@ fn init(
     (master_account, amm_contract, token_contract, alice, bob, carol)
 }
 
-fn init_token(
+
+pub fn init_token(
     token_contract: &UserAccount,
     owner_id: AccountId,
     initial_balance: u128
@@ -100,7 +103,7 @@ fn init_token(
     }
 }
 
-fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
+pub fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     let tx = token_account.create_transaction(token_account.account_id());
     let args = json!({
         "account_id": account_id
@@ -110,7 +113,7 @@ fn get_balance(token_account: &UserAccount, account_id: AccountId) -> u128 {
     balance.into()
 }
 
-fn register(token_account: &UserAccount, sender: &UserAccount, to_register: &AccountId)  {
+pub fn register(token_account: &UserAccount, sender: &UserAccount, to_register: &AccountId)  {
     let tx = sender.create_transaction(token_account.account_id());
     let args = json!({
         "account_id": to_register
@@ -121,7 +124,7 @@ fn register(token_account: &UserAccount, sender: &UserAccount, to_register: &Acc
     }
 }
 
-fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128)  {
+pub fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128)  {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
         "receiver_id": to,
@@ -134,7 +137,7 @@ fn transfer_unsafe(token_account: &UserAccount, from: &UserAccount, to: AccountI
     }
 }
 
-fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128, payload: String) -> ExecutionResult {
+pub fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: AccountId, amt: u128, payload: String) -> ExecutionResult {
     let tx = from.create_transaction(token_account.account_id());
     let args = json!({
         "receiver_id": to,
@@ -149,9 +152,9 @@ fn transfer_with_vault(token_account: &UserAccount, from: &UserAccount, to: Acco
     res
 }
 
-fn empty_string() -> String { "".to_string() }
+pub fn empty_string() -> String { "".to_string() }
 
-fn empty_string_vec(len: u16) -> Vec<String> { 
+pub fn empty_string_vec(len: u16) -> Vec<String> { 
     let mut tags: Vec<String> = vec![];
     for i in 0..len {
         tags.push(empty_string());
@@ -160,14 +163,14 @@ fn empty_string_vec(len: u16) -> Vec<String> {
     tags
 }
 
-fn env_time() -> U64{ 
+pub fn env_time() -> U64{ 
     1609951265967.into()
 }
-fn fee() -> U128 {
+pub fn fee() -> U128 {
     (10_u128.pow(18) / 50).into() // 2%
 }
 
-fn create_market(creator: &UserAccount, amm: &ContractAccount<FluxProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
+pub fn create_market(creator: &UserAccount, amm: &ContractAccount<ProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
     call!(
         creator,
         amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
@@ -175,15 +178,15 @@ fn create_market(creator: &UserAccount, amm: &ContractAccount<FluxProtocolContra
     ).unwrap_json()
 }
 
-fn to_token_denom(amt: u128) -> u128 {
+pub fn to_token_denom(amt: u128) -> u128 {
     amt * 10_u128.pow(18)
 }
 
-fn swap_fee() -> U128 {
+pub fn swap_fee() -> U128 {
     U128(to_token_denom(2) / 100)
 }
 
-fn product_of(nums: &Vec<U128>) -> u128 {
+pub fn product_of(nums: &Vec<U128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
     let mut product = constants::TOKEN_DENOM;
 
@@ -194,7 +197,7 @@ fn product_of(nums: &Vec<U128>) -> u128 {
     product
 }
 
-fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
+pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
     let product = product_of(&prices);
     
     prices.iter().map(|price| {
@@ -202,19 +205,10 @@ fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
     }).collect()
 }
 
-fn unwrap_u128_vec(vec_in: &Vec<U128>) -> Vec<u128> {
+pub fn unwrap_u128_vec(vec_in: &Vec<U128>) -> Vec<u128> {
     vec_in.iter().map(|n| { u128::from(*n) }).collect()
 }
 
-fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
+pub fn wrap_u128_vec(vec_in: &Vec<u128>) -> Vec<U128> {
     vec_in.iter().map(|n| { U128(*n) }).collect()
 }
-
-// runtime tests
-mod init_tests;
-mod pool_initiation_tests;
-mod pricing_tests;
-mod swap_tests;
-mod liquidity_tests;
-mod fee_tests;
-mod market_end_tests;

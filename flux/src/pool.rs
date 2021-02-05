@@ -189,6 +189,7 @@ impl Pool {
         );
 
         let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance);
+        
         self.mint_internal(sender, to_mint);
 
         logger::log_pool(&self);

@@ -1,5 +1,6 @@
-use super::*;
-
+use near_sdk_sim::to_yocto;
+mod test_utils;
+use test_utils::*;
 #[test]
 fn test_contract_initiation() {
     let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());

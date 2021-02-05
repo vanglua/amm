@@ -17,8 +17,7 @@ use near_sdk::{
     AccountId, 
     env,
     collections::{
-        LookupMap,
-        Vector
+        LookupMap
     },
 };
 
@@ -50,7 +49,7 @@ pub trait CollateralToken {
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct FluxProtocol {
+pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: LookupMap<u64, Market>,
     id: u64, // Incrementing number that's used to define a pool's id
@@ -58,7 +57,7 @@ pub struct FluxProtocol {
 }
 
 #[near_bindgen]
-impl FluxProtocol {
+impl Protocol {
 
     /**
      * @notice Initialize the contract by setting the owner
@@ -343,6 +342,7 @@ impl FluxProtocol {
 
     /*** Gov setters ***/
 
+    // TODO: validate payout num arr
     #[payable]
     pub fn resolute_market(
         &mut self,
@@ -391,7 +391,7 @@ impl FluxProtocol {
     }
 }
 
-impl FluxProtocol {
+impl Protocol {
     fn assert_gov(&self) {
         assert_eq!(env::predecessor_account_id(), self.gov, "ERR_NO_GOVERNANCE_ADDRESS");
     }

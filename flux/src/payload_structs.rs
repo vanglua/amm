@@ -7,7 +7,7 @@ use near_sdk::{
     serde_json::Value,
 };
 
-use serde::{
+use near_sdk::serde::{
     Serialize, 
     Deserialize,
     de::{

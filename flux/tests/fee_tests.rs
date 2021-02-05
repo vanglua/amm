@@ -1,8 +1,12 @@
-use super::*;
+mod test_utils;
+use test_utils::*;
+use near_sdk::json_types::{U64, U128};
+use near_sdk::serde_json::json;
+use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn valid_market_lp_fee_test() {
-    let (master_account, amm, token, funder, joiner, trader) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("1"), "alice".to_string(), "carol".to_string());
 
     let joiner_trader_balances = to_token_denom(10000);
     let funder_balance = to_yocto("100") - joiner_trader_balances * 2;
@@ -104,7 +108,7 @@ fn valid_market_lp_fee_test() {
 // TODO: split up tests
 #[test]
 fn invalid_market_lp_fee_test() {
-    let (master_account, amm, token, funder, joiner, trader) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("1"), "alice".to_string(), "carol".to_string());
 
     let joiner_trader_balances = to_token_denom(10000);
 

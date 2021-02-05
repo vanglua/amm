@@ -1,4 +1,8 @@
-use super::*;
+mod test_utils;
+use test_utils::*;
+use near_sdk::json_types::{U64, U128};
+use near_sdk::serde_json::json;
+use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn calc_buy_amount_test() {
@@ -231,7 +235,7 @@ fn complex_buy_test() {
     let inverse_balances: Vec<U128> = vec![post_trade_balances[1], post_trade_balances[2]];
     let product_of_inverse = product_of(&inverse_balances);
 
-    let expected_pool_target_balance = math::div_u128(post_trade_invariant, product_of_inverse);
+    let expected_pool_target_balance = test_utils::math::div_u128(post_trade_invariant, product_of_inverse);
     let expected_buyer_target_balance = u128::from(init_balances[0]) + buy_amount - expected_pool_target_balance;
 
     assert_eq!(U128(expected_buyer_target_balance), target_buyer_balance);
@@ -495,20 +499,8 @@ fn selling_uneven_lp_shares_categorical_test() {
 fn sell_exited_pool_token_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
-
-    let precision = to_token_denom(1) / 100; // 1 token_cent precision
-
-    // Fund accounts
-    transfer_unsafe(&token, &lp, trader1.account_id(), to_token_denom(10));
-    transfer_unsafe(&token, &lp, trader2.account_id(), to_token_denom(10));
-
-    // Get initial balances
-    let trader1_init_balance = get_balance(&token, trader1.account_id());
     
-    // Seed / trade parameters
-    let target_price = U128(to_token_denom(5) / 10);
     let seed_amt = to_token_denom(10);
-    let shares_to_sell = 3_342_414_373_536_299_767;
     let weights = vec![U128(12_000_000_000), U128(12_000_000_000), U128(18_000_000_000), U128(18_000_000_000)];
 
     // Create market
@@ -530,18 +522,10 @@ fn sell_exited_pool_token_test() {
     }).to_string();
     let publish_res = transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
 
-    println!("res: {:?}", publish_res);
+    // Exit pool
 
-    let amm_final_balance = get_balance(&token, "amm".to_string());
-    assert_eq!(amm_final_balance, seed_amt);
+    // Sell exited shares back into pool
 
-    // Sell back from trader 1 and trader 2 
-    let sell_res_trader1 = call!(
-        lp,
-        amm.sell(market_id, U128(to_token_denom(83) / 100), 0, U128(shares_to_sell)),
-        deposit = STORAGE_AMOUNT
-    );
 
-    println!("sell res: {:?}", sell_res_trader1);
 
 }
