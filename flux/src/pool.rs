@@ -341,6 +341,8 @@ impl Pool {
             self.fee_pool_weight -= ineligible_fee_amount;
         }
 
+        logger::log_pool(self);
+
         fees
     }
 
