@@ -548,6 +548,11 @@ impl Pool {
         payout_numerators: &Option<Vec<U128>>
     ) -> u128 {
         let balances = self.get_and_clear_balances(account_id);
+
+        let pool_token_balance = self.get_pool_token_balance(account_id);
+        if pool_token_balance > 0 {
+            self.exit_pool(account_id, pool_token_balance);
+        }
         
         let account = match self.accounts.get(account_id) {
             Some(account) => account,
