@@ -185,33 +185,33 @@ impl Protocol {
         market_id.into()
     }
 
-    #[payable]
-    pub fn seed_pool(
-        &mut self, 
-        market_id: U64,
-        total_in: U128, 
-        denorm_weights: Vec<U128>
-    ) {
-        let initial_storage = env::storage_usage();
+    // #[payable]
+    // pub fn seed_pool(
+    //     &mut self, 
+    //     market_id: U64,
+    //     total_in: U128, 
+    //     denorm_weights: Vec<U128>
+    // ) {
+    //     let initial_storage = env::storage_usage();
 
-        let weights_u128: Vec<u128> = denorm_weights
-            .iter()
-            .map(|weight| { u128::from(*weight) })
-            .collect();
+    //     let weights_u128: Vec<u128> = denorm_weights
+    //         .iter()
+    //         .map(|weight| { u128::from(*weight) })
+    //         .collect();
 
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_Market");
-        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+    //     let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_Market");
+    //     assert!(!market.finalized, "ERR_FINALIZED_MARKET");
+    //     assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
 
-        market.pool.seed_pool(
-            &env::predecessor_account_id(), 
-            total_in.into(), 
-            &weights_u128
-        );
+    //     market.pool.seed_pool(
+    //         &env::predecessor_account_id(), 
+    //         total_in.into(), 
+    //         &weights_u128
+    //     );
         
-        self.markets.insert(&market_id.into(), &market);
-        self.refund_storage(initial_storage, env::predecessor_account_id());
-    }
+    //     self.markets.insert(&market_id.into(), &market);
+    //     self.refund_storage(initial_storage, env::predecessor_account_id());
+    // }
 
     #[payable]
     pub fn exit_pool(
@@ -328,8 +328,8 @@ impl Protocol {
 
         let prom: Promise;
         match parsed_payload.function.as_str() {
-            "publish" => prom = self.publish_pool(&sender_id, vault_id, amount, parsed_payload.args),
-            "join_pool" => prom = self.join_pool(&sender_id, vault_id, amount, parsed_payload.args),
+            // "publish" => prom = self.publish_pool(&sender_id, vault_id, amount, parsed_payload.args),
+            // "join_pool" => prom = self.join_pool(&sender_id, vault_id, amount, parsed_payload.args), 
             "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
@@ -404,48 +404,34 @@ impl Protocol {
         ns_timestamp / 1_000_000
     }
 
-    fn publish_pool(
-        &mut self,
-        sender: &AccountId,
-        vault_id: u64,
-        total_in: u128, 
-        args: serde_json::Value,
-    ) -> Promise {
-        let parsed_args: payload_structs::LPPool = payload_structs::from_args(args);
-        let mut market = self.markets.get(&parsed_args.market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
-        self.assert_collateral_token(&market.pool.collateral_token_id);
-
-        let withdraw_amount = market.pool.publish(&sender, total_in);
-        self.markets.insert(&parsed_args.market_id.into(), &market);
-
-        collateral_token::withdraw_from_vault(
-            vault_id, 
-            env::current_account_id(), 
-            withdraw_amount.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
-    }
-
-    fn join_pool(
+    fn add_liquidity(
         &mut self, 
         sender: &AccountId,
         vault_id: u64,
-        total_in: u128, 
+        total_in: u128,
         args: serde_json::Value,
     ) -> Promise {
-        let parsed_args: payload_structs::LPPool = payload_structs::from_args(args);
+        let parsed_args: payload_structs::AddLiquidity = payload_structs::from_args(args);
+        let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
+            Some(weight_indication) => {
+                Some(weight_indication
+                    .iter()
+                    .map(|weight| { u128::from(*weight) })
+                    .collect()
+                )
+            },
+            None => None
+        };
+           
         let mut market = self.markets.get(&parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         self.assert_collateral_token(&market.pool.collateral_token_id);
         
-        market.pool.join_pool(
+        market.pool.add_liquidity(
             &sender, 
-            total_in
+            total_in,
+            weights_u128
         );
         self.markets.insert(&parsed_args.market_id.into(), &market);
 

@@ -57,7 +57,7 @@ impl Account {
 pub struct Pool {
     pub id: u64,
     pub seed_nonce: u64,
-    pub owner: AccountId,
+    pub owner: AccountId, // TODO: rm
     pub collateral_token_id: AccountId,
     pub lp_entries: LookupMap<AccountId, LPEntries>,
     pub outcomes: u16,
@@ -68,7 +68,7 @@ pub struct Pool {
     pub total_withdrawn_fees: u128,
     pub fee_pool_weight: u128,
     pub accounts: LookupMap<AccountId, Account>,
-    pub public: bool,
+    pub public: bool, // TODO: rm
 }
 
 impl Pool {
@@ -90,7 +90,7 @@ impl Pool {
             lp_entries: LookupMap::new(format!("pool:{}:lp_entries", pool_id).as_bytes().to_vec()),
             outcomes,
             outcome_tokens: UnorderedMap::new(format!("pool_:{}:outcome_tokens", pool_id).as_bytes().to_vec()),
-            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0, 0),
+            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0),
             swap_fee,
             withdrawn_fees: LookupMap::new(format!("pool:{}:withdrawn_fees", pool_id).as_bytes().to_vec()),
             total_withdrawn_fees: 0,
@@ -122,65 +122,41 @@ impl Pool {
         }).collect()
     }
 
-    pub fn seed_pool(
+    pub fn add_liquidity(
         &mut self,
         sender: &AccountId,
-        total_in: u128, 
-        weight_indication: &Vec<u128>
+        total_in: u128,
+        weight_indication: Option<Vec<u128>>
     ) {
-        assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
-        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_MIN_SEED_AMOUNT");
-        assert!(!self.public, "ERR_POOL_PUBLIC");
-        assert!(weight_indication.len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
-        
+        assert!(total_in >= constants::MIN_LIQUIDITY_AMOUNT, "ERR_MIN_LIQUIDITY_AMOUNT");
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
-        let max_weight = weight_indication.iter().max().unwrap();
-        
-        for (i, weight) in weight_indication.iter().enumerate() {
-            let remaining = math::div_u128(math::mul_u128(total_in, *weight), *max_weight);   
-            outcome_tokens_to_return.insert(i, total_in - remaining);
-        }
 
-        let pool_token_supply = self.pool_token.total_supply();
+        let to_mint = if self.pool_token.total_supply() > 0 {
+            assert!(weight_indication.is_none(), "ERR_UNEXPECTED_WEIGHT_INDICATION");
+            let weights = weight_indication.unwrap();
+            let max_weight = weights.iter().max().unwrap();
 
-        if pool_token_supply > 0 {
-            self.accounts.remove(sender);
-            self.outcome_tokens.clear();
-            self.burn_internal(&env::predecessor_account_id(), self.pool_token.total_supply());
-        }
+            for (i, weight) in weights.iter().enumerate() {
+                let remaining = math::div_u128(math::mul_u128(total_in, *weight), *max_weight);   
+                outcome_tokens_to_return.insert(i, total_in - remaining);
+            }
+            
+            total_in
+        } else {
+            assert!(weight_indication.is_some(), "ERR_EXPECTED_WEIGHT_INDICATION");
+            assert!(weight_indication.unwrap().len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
+            
+            let pool_balances = self.get_pool_balances();
+            let max_balance = pool_balances.iter().max().unwrap(); // max_balance = cheapest outcome
+            let pool_supply = self.pool_token.total_supply();
+    
+            for (i, balance) in pool_balances.iter().enumerate() {
+                let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_balance); // remaining = amt_in * balance / max_balance 
+                outcome_tokens_to_return.insert(i, total_in - remaining);
+            }
 
-        self.mint_and_transfer_outcome_tokens(
-            sender, 
-            total_in, 
-            &outcome_tokens_to_return
-        );
-        
-        self.mint_internal(sender, total_in);
-        self.seed_nonce += 1;
-
-        logger::log_pool(&self);
-        logger::log_user_pool_status(&self, &env::predecessor_account_id(), total_in);
-    }
-
-    //TODO:
-    // pub fn seed_and_publish_pool ()
-
-    pub fn join_pool(
-        &mut self,
-        sender: &AccountId,
-        total_in: u128
-    ) {
-        assert!(self.public, "ERR_NOT_PUBLIC");
-        assert!(total_in >= constants::MIN_SEED_AMOUNT, "ERR_MIN_JOIN_AMOUNT");
-        let mut outcome_tokens_to_return: Vec<u128> = vec![];
-        let pool_balances = self.get_pool_balances();
-        let max_balance = pool_balances.iter().max().unwrap(); // max_balance = cheapest outcome
-        let pool_supply = self.pool_token.total_supply();
-
-        for (i, balance) in pool_balances.iter().enumerate() {
-            let remaining = math::div_u128(math::mul_u128(total_in, *balance), *max_balance); // remaining = amt_in * balance / max_balance 
-            outcome_tokens_to_return.insert(i, total_in - remaining);
-        }
+            math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance)
+        };
 
         self.mint_and_transfer_outcome_tokens(
             sender, 
@@ -188,8 +164,6 @@ impl Pool {
             &outcome_tokens_to_return
         );
 
-        let to_mint = math::div_u128(math::mul_u128(total_in, pool_supply), *max_balance);
-        
         self.mint_internal(sender, to_mint);
 
         logger::log_pool(&self);
@@ -201,7 +175,7 @@ impl Pool {
         sender: &AccountId,
         total_in: u128
     ) ->  u128 {
-        assert!(self.public, "ERR_NOT_PUBLIC");
+
         let balances = self.get_pool_balances();
         let pool_token_supply = self.pool_token.total_supply();
         let sender_pool_token_balance = self.pool_token.get_balance(sender);
@@ -266,7 +240,7 @@ impl Pool {
 
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, self.seed_nonce, 0) });
+            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, 0) });
             
             outcome_token.mint(& env::current_account_id(), total_in);
 
@@ -372,22 +346,22 @@ impl Pool {
         withdrawable_amount
     }  
 
-    pub fn publish(
-        &mut self,
-        sender: &AccountId,
-        amount_in: u128
-    ) -> u128 {
-        assert!(!self.public, "ERR_IS_PUBLIC");
-        assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
-        assert_eq!(self.outcome_tokens.len() as u16, self.outcomes, "ERR_NOT_BINDED");
-        assert!(amount_in >= self.pool_token.total_supply(), "ERR_INSUFFICIENT_COLLATERAL");
+    // pub fn publish(
+    //     &mut self,
+    //     sender: &AccountId,
+    //     amount_in: u128
+    // ) -> u128 {
 
-        self.public = true;
+    //     assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
+    //     assert_eq!(self.outcome_tokens.len() as u16, self.outcomes, "ERR_NOT_BINDED");
+    //     assert!(amount_in >= self.pool_token.total_supply(), "ERR_INSUFFICIENT_COLLATERAL");
 
-        logger::log_pool(&self);
 
-        self.pool_token.total_supply()
-    }
+
+    //     logger::log_pool(&self);
+
+    //     self.pool_token.total_supply()
+    // }
 
     pub fn calc_buy_amount(
         &self, 
@@ -450,7 +424,7 @@ impl Pool {
         outcome_target: u16,
         min_shares_out: u128
     ) {
-        assert!(self.public, "ERR_NOT_PUBLIC");
+
         assert!(outcome_target < self.outcomes, "ERR_INVALID_OUTCOME");
 
         let shares_out = self.calc_buy_amount(amount_in, outcome_target);
@@ -484,7 +458,7 @@ impl Pool {
         outcome_target: u16,
         max_shares_in: u128
     ) -> u128 {
-        assert!(self.public, "ERR_NOT_PUBLIC");
+
         assert!(outcome_target < self.outcomes, "ERR_INVALID_OUTCOME");
         let shares_in = self.calc_sell_collateral_out(amount_out, outcome_target);
 

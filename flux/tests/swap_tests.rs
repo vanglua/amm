@@ -489,8 +489,6 @@ fn selling_uneven_lp_shares_categorical_test() {
     assert!(sell_res_lp.is_ok());
 }
 
-
-//TODO:
 #[test]
 fn sell_exited_pool_token_test() {
     // Get accounts
