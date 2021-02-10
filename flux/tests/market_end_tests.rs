@@ -10,15 +10,18 @@ fn test_valid_market_resolution() {
 
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
-    let seed_amt = to_token_denom(100);
+    let seed_amount = to_token_denom(100);
     let buy_amt = to_token_denom(1);
     let weights = calc_weights_from_price(vec![target_price, target_price]);
-
-    call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amt), weights),
-        deposit = STORAGE_AMOUNT
-    );
+    
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let payout_num = vec![U128(0), U128(to_token_denom(1))];
     
@@ -45,23 +48,18 @@ fn test_valid_market_payout() {
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), to_token_denom(10000));
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
-    let seed_amt = to_token_denom(100);
+    let seed_amount = to_token_denom(100);
     let buy_amt = to_token_denom(1);
     let weights = calc_weights_from_price(vec![target_price, target_price]);
 
-    call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amt), weights),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amt, publish_args);
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let payout_num = vec![U128(0), U128(to_token_denom(1))];
     let buy_a_args = json!({
@@ -145,31 +143,25 @@ fn test_invalid_market_payout() {
         
         // Seed / trade parameters
         let target_price = U128(to_token_denom(5) / 10);
-        let seed_amt = to_token_denom(100);
+        let seed_amount = to_token_denom(100);
         let buy_amt = to_token_denom(1);
         let weights = calc_weights_from_price(vec![target_price, target_price]);
 
         // Create market
         let market_id = create_market(&lp, &amm, 2, Some(U128(0)));
         
-        // Seed market
-        call!(
-            lp,
-            amm.seed_pool(market_id, U128(seed_amt), weights),
-            deposit = STORAGE_AMOUNT
-        );
 
-        // Publish market
-        let publish_args = json!({
-            "function": "publish",
+        let add_liquidity_args = json!({
+            "function": "add_liquidity",
             "args": {
-                "market_id": market_id
+                "market_id": market_id,
+                "weight_indication": weights
             }
         }).to_string();
-        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
+        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amount, add_liquidity_args);
 
         let amm_final_balance = get_balance(&token, "amm".to_string());
-        assert_eq!(amm_final_balance, seed_amt);
+        assert_eq!(amm_final_balance, seed_amount);
 
         // Trade with trader x amount of times
         let buy_a_args = json!({
@@ -204,7 +196,7 @@ fn test_invalid_market_payout() {
         // LP exits his position
         let lp_exit_res = call!(
             lp,
-            amm.exit_pool(market_id, seed_amt.into()),
+            amm.exit_pool(market_id, seed_amount.into()),
             deposit = STORAGE_AMOUNT
         );
         

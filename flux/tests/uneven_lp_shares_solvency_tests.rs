@@ -20,30 +20,21 @@ fn test_invalid_market_payout() {
         
         // Seed / trade parameters
         let weights = vec![U128(to_token_denom(3) / 10), U128(to_token_denom(7) / 10)];
-        let seed_amt = to_token_denom(10);
+        let seed_amount = to_token_denom(10);
         let buy_amt = to_token_denom(1);
 
         
         // Create market
         let market_id = create_market(&lp, &amm, 2, Some(U128(0)));
         
-        // Seed market w/ `seed_amt`
-        call!(
-            lp,
-            amm.seed_pool(market_id, U128(seed_amt), weights),
-            deposit = STORAGE_AMOUNT
-        );
-        
-        // Check lp expected balance of outcome 0
-        
-        // Publish market
-        let publish_args = json!({
-            "function": "publish",
+        let add_liquidity_args = json!({
+            "function": "add_liquidity",
             "args": {
-                "market_id": market_id
+                "market_id": market_id,
+                "weight_indication": weights
             }
         }).to_string();
-        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
+        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amount, add_liquidity_args);
         
         // assert expected price for 0 & 1 (70 | 30)
         let price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
