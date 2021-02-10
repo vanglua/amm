@@ -205,15 +205,19 @@ pub fn log_market_status(market: &Market) {
 
 
 fn log_to_escrow(escrow_type: String, market_id: u64, sender: &AccountId, amount: u128){ 
-    json!({
-        "type": "escrow_statuses",
-        "params": {
-            "market_id": U64(market_id),
-            "claimer": sender,
-            "payout": U128(amount),
-            "type": escrow_type,
-        }
-    });
+    env::log(
+        json!({
+            "type": "escrow_statuses",
+            "params": {
+                "market_id": U64(market_id),
+                "claimer": sender,
+                "payout": U128(amount),
+                "type": escrow_type,
+            }
+        })
+        .to_string()
+        .as_bytes()
+    );
 }
 
 pub fn log_to_invalid_escrow(market_id: u64, sender: &AccountId, amount: u128){ 
