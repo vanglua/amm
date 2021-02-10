@@ -328,8 +328,7 @@ impl Protocol {
 
         let prom: Promise;
         match parsed_payload.function.as_str() {
-            // "publish" => prom = self.publish_pool(&sender_id, vault_id, amount, parsed_payload.args),
-            // "join_pool" => prom = self.join_pool(&sender_id, vault_id, amount, parsed_payload.args), 
+            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args), 
             "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };

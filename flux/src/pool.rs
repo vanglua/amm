@@ -131,9 +131,10 @@ impl Pool {
         assert!(total_in >= constants::MIN_LIQUIDITY_AMOUNT, "ERR_MIN_LIQUIDITY_AMOUNT");
         let mut outcome_tokens_to_return: Vec<u128> = vec![];
 
-        let to_mint = if self.pool_token.total_supply() > 0 {
-            assert!(weight_indication.is_none(), "ERR_UNEXPECTED_WEIGHT_INDICATION");
+        let to_mint = if self.pool_token.total_supply() == 0 {
+            assert!(weight_indication.is_some(), "ERR_EXPECTED_WEIGHT_INDICATION");
             let weights = weight_indication.unwrap();
+            assert!(weights.len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
             let max_weight = weights.iter().max().unwrap();
 
             for (i, weight) in weights.iter().enumerate() {
@@ -143,8 +144,7 @@ impl Pool {
             
             total_in
         } else {
-            assert!(weight_indication.is_some(), "ERR_EXPECTED_WEIGHT_INDICATION");
-            assert!(weight_indication.unwrap().len() as u16 == self.outcomes, "ERR_INVALID_WEIGHTS");
+            assert!(weight_indication.is_none(), "ERR_UNEXPECTED_WEIGHT_INDICATION");
             
             let pool_balances = self.get_pool_balances();
             let max_balance = pool_balances.iter().max().unwrap(); // max_balance = cheapest outcome
