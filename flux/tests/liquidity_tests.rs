@@ -201,7 +201,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res1 = call!(
         alice,
@@ -209,7 +208,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res1.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res2 = call!(
         alice,
@@ -217,7 +215,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res2.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res3 = call!(
         alice,
@@ -225,7 +222,110 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res3.is_ok());
-    println!("{:?}", alice_exit_res);
+
+    // assert pool balances
+    let alice_pool_token_balance_post_exit: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+    assert_eq!(alice_pool_token_balance_post_exit, U128(u128::from(alice_pool_token_balance_pre_exit) - exit_amount0 - exit_amount1 -exit_amount2 - exit_amount3));
+}
+
+#[test]
+fn join_zero_liq_test() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
+    let transfer_amount = to_token_denom(100);
+    transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
+    assert_eq!(market_id, U64(0));
+
+    let seed_amount = to_token_denom(100);
+    let join_amount0 = to_token_denom(500);
+    let join_amount1 = to_token_denom(300);
+
+    let exit_amount0 = to_token_denom(100);
+    let exit_amount1 = to_token_denom(200);
+    let exit_amount2 = to_token_denom(50);
+    let exit_amount3 = to_token_denom(33);
+
+    let buy_amount = to_token_denom(10);
+
+    let half = to_token_denom(5) / 10;
+
+    let seed_pool_res = call!(
+        bob,
+        amm.seed_pool(market_id, U128(seed_amount), vec![U128(half), U128(half)]),
+        deposit = STORAGE_AMOUNT
+    );
+
+    let publish_args = json!({
+        "function": "publish",
+        "args": {
+            "market_id": market_id
+        }
+    }).to_string();
+    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, publish_args);
+
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &bob.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(seed_amount));
+
+    let join_args = json!({
+        "function": "join_pool",
+        "args": {
+            "market_id": market_id,
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), join_amount0, join_args.to_string());
+
+
+    let buy_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(to_token_denom(15) / 10)
+        }
+    }).to_string();
+    let buy_args2 = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 1,
+            "min_shares_out": U128(to_token_denom(15) / 10)
+        }
+    }).to_string();
+
+    let buy_res = transfer_with_vault(&token, &alice, "amm".to_string(), buy_amount, buy_args);
+    let buy_res = transfer_with_vault(&token, &alice, "amm".to_string(), buy_amount, buy_args2);
+
+    transfer_with_vault(&token, &alice, "amm".to_string(), join_amount1, join_args);
+    let alice_pool_token_balance_pre_exit: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+
+
+    let alice_exit_res = call!(
+        alice,
+        amm.exit_pool(market_id, U128(exit_amount0)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(alice_exit_res.is_ok());
+
+    let alice_exit_res1 = call!(
+        alice,
+        amm.exit_pool(market_id, U128(exit_amount1)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(alice_exit_res1.is_ok());
+
+    let alice_exit_res2 = call!(
+        alice,
+        amm.exit_pool(market_id, U128(exit_amount2)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(alice_exit_res2.is_ok());
+
+    let alice_exit_res3 = call!(
+        alice,
+        amm.exit_pool(market_id, U128(exit_amount3)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(alice_exit_res3.is_ok());
 
     // assert pool balances
     let alice_pool_token_balance_post_exit: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();

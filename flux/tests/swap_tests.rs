@@ -440,7 +440,6 @@ fn selling_uneven_lp_shares_binary_test() {
     );
     
 
-    println!("sell res: {:?}", sell_res_lp);
     assert!(sell_res_lp.is_ok());
 
 }
@@ -466,7 +465,6 @@ fn selling_uneven_lp_shares_categorical_test() {
         deposit = STORAGE_AMOUNT
     );
 
-    println!("seed res: {:?}", seed_res);
 
 
     // Publish market
@@ -478,7 +476,6 @@ fn selling_uneven_lp_shares_categorical_test() {
     }).to_string();
     let publish_res = transfer_with_vault(&token, &lp, "amm".to_string(), seed_amt, publish_args);
 
-    println!("res: {:?}", publish_res);
 
     let amm_final_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_final_balance, seed_amt);
@@ -489,7 +486,6 @@ fn selling_uneven_lp_shares_categorical_test() {
         deposit = STORAGE_AMOUNT
     );
 
-    println!("sell res: {:?}", sell_res_lp);
     assert!(sell_res_lp.is_ok());
 }
 
