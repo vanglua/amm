@@ -60,13 +60,13 @@ pub struct Protocol {
 impl Protocol {
 
     /**
-     * @notice Initialize the contract by setting the owner
-     * @param owner The `account_id` that's going to have owner privileges
+     * @notice Initialize the contract by setting the
+     * @param gov is the account_id of the account with governance privilages
+     * @param token_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
-    pub fn init(owner: AccountId, gov: AccountId, token_whitelist: Vec<AccountId>) -> Self {
+    pub fn init(gov: AccountId, token_whitelist: Vec<AccountId>) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
-        assert!(env::is_valid_account_id(owner.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
         assert!(env::is_valid_account_id(gov.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
         
         Self {
