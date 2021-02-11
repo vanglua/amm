@@ -337,26 +337,26 @@ impl Protocol {
 
     pub fn set_gov(
         &mut self,
-        new_gov: AccountId
+        new_gov: ValidAccountId
     ) {
         self.assert_gov();
-        self.gov = new_gov;
+        self.gov = new_gov.into();
     }
 
     pub fn set_token_whitelist(
         &mut self,
-        whitelist: Vec<AccountId>
+        whitelist: Vec<ValidAccountId>
     ) {
         self.assert_gov();
-        self.token_whitelist = whitelist;
+        self.token_whitelist = whitelist.into_iter().map(|t| t.into()).collect();
     }
 
     pub fn add_to_token_whitelist(
         &mut self,
-        to_add: AccountId
+        to_add: ValidAccountId
     ) {
         self.assert_gov();
-        self.token_whitelist.push(to_add);
+        self.token_whitelist.push(to_add.into());
     }
 }
 
