@@ -185,34 +185,6 @@ impl Protocol {
         market_id.into()
     }
 
-    // #[payable]
-    // pub fn seed_pool(
-    //     &mut self, 
-    //     market_id: U64,
-    //     total_in: U128, 
-    //     denorm_weights: Vec<U128>
-    // ) {
-    //     let initial_storage = env::storage_usage();
-
-    //     let weights_u128: Vec<u128> = denorm_weights
-    //         .iter()
-    //         .map(|weight| { u128::from(*weight) })
-    //         .collect();
-
-    //     let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_Market");
-    //     assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-    //     assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
-
-    //     market.pool.seed_pool(
-    //         &env::predecessor_account_id(), 
-    //         total_in.into(), 
-    //         &weights_u128
-    //     );
-        
-    //     self.markets.insert(&market_id.into(), &market);
-    //     self.refund_storage(initial_storage, env::predecessor_account_id());
-    // }
-
     #[payable]
     pub fn exit_pool(
         &mut self, 

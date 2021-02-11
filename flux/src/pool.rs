@@ -90,7 +90,7 @@ impl Pool {
             lp_entries: LookupMap::new(format!("pool:{}:lp_entries", pool_id).as_bytes().to_vec()),
             outcomes,
             outcome_tokens: UnorderedMap::new(format!("pool_:{}:outcome_tokens", pool_id).as_bytes().to_vec()),
-            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0),
+            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0, 0), // TODO: rm seed_nonce
             swap_fee,
             withdrawn_fees: LookupMap::new(format!("pool:{}:withdrawn_fees", pool_id).as_bytes().to_vec()),
             total_withdrawn_fees: 0,
@@ -238,9 +238,10 @@ impl Pool {
             let prev_spent = account.entries.get(&outcome).unwrap_or(0);
             account.entries.insert(&outcome, &(prev_spent + spent_on_amount_out));
 
+            // TODO: rm seed_nonce
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, 0) });
+            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, self.seed_nonce, 0) });
             
             outcome_token.mint(& env::current_account_id(), total_in);
 
