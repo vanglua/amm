@@ -92,7 +92,7 @@ impl Protocol {
         market_id: U64
     ) -> Vec<U128>{
         let market = self.markets.get(market_id.into()).expect("ERR_NO_POOL");
-        market.pool.get_pool_balances().iter().map(|b| { U128(*b) }).collect()
+        market.pool.get_pool_balances().iter().map(|&b| { b.into() }).collect()
     }
     
     pub fn get_pool_token_balance(&self, market_id: U64, owner_id: &AccountId) -> U128 {
