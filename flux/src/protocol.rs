@@ -10,11 +10,11 @@ use near_sdk::{
     Promise,
     PanicOnDefault,
     json_types::{
-        U128, 
+        U128,
         U64
     },
     serde_json,
-    AccountId, 
+    AccountId,
     env,
     collections::{
         LookupMap
@@ -36,7 +36,7 @@ const MIN_FEE: u128 = TOKEN_DENOM / 10_000; // max fee is %0.01
 pub struct Market {
     pub end_time: u64,
     pub pool: Pool,
-    pub payout_numerator: Option<Vec<U128>>, 
+    pub payout_numerator: Option<Vec<U128>>,
     pub finalized: bool,
 }
 
@@ -68,7 +68,7 @@ impl Protocol {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         assert!(env::is_valid_account_id(owner.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
         assert!(env::is_valid_account_id(gov.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
-        
+
         Self {
             gov,
             markets: LookupMap::new(b"markets".to_vec()),
@@ -93,15 +93,15 @@ impl Protocol {
         let market = self.markets.get(&market_id.into()).expect("ERR_NO_POOL");
         market.pool.get_pool_balances().iter().map(|b| { U128(*b) }).collect()
     }
-    
+
     pub fn get_pool_token_balance(&self, market_id: U64, owner_id: &AccountId) -> U128 {
         let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
         U128(market.pool.get_pool_token_balance(owner_id))
     }
 
     pub fn get_spot_price_sans_fee(
-        &self, 
-        market_id: U64, 
+        &self,
+        market_id: U64,
         outcome: u16
     ) -> U128 {
         let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
@@ -109,8 +109,8 @@ impl Protocol {
     }
 
     pub fn calc_buy_amount(
-        &self, 
-        market_id: U64, 
+        &self,
+        market_id: U64,
         collateral_in: U128,
         outcome_target: u16
     ) -> U128 {
@@ -119,9 +119,9 @@ impl Protocol {
     }
 
     pub fn calc_sell_collateral_out(
-        &self, 
-        market_id: U64, 
-        collateral_out: U128, 
+        &self,
+        market_id: U64,
+        collateral_out: U128,
         outcome_target: u16
     ) -> U128 {
         let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
@@ -166,19 +166,19 @@ impl Protocol {
             collateral_token_id,
             swap_fee
         );
-        
+
         logger::log_pool(&pool);
-        
+
         let market = Market {
             end_time,
             pool,
             payout_numerator: None,
             finalized: false
         };
-        
+
         logger::log_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
-        
+
         self.markets.insert(&market_id, &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
         self.id += 1;
@@ -187,18 +187,18 @@ impl Protocol {
 
     #[payable]
     pub fn exit_pool(
-        &mut self, 
+        &mut self,
         market_id: U64,
-        total_in: U128, 
+        total_in: U128,
     ) -> PromiseOrValue<bool> {
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
         let fees_earned = market.pool.exit_pool(
-            &env::predecessor_account_id(), 
+            &env::predecessor_account_id(),
             total_in.into()
         );
-        
+
         self.markets.insert(&market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
@@ -206,7 +206,7 @@ impl Protocol {
         if fees_earned > 0 {
             PromiseOrValue::Promise(
                 collateral_token::transfer(
-                    env::predecessor_account_id(), 
+                    env::predecessor_account_id(),
                     fees_earned.into(),
                     &market.pool.collateral_token_id,
                     0,
@@ -220,9 +220,9 @@ impl Protocol {
 
     #[payable]
     pub fn sell(
-        &mut self, 
-        market_id: U64, 
-        collateral_out: U128, 
+        &mut self,
+        market_id: U64,
+        collateral_out: U128,
         outcome_target: u16,
         max_shares_in: U128
     ) -> Promise {
@@ -233,8 +233,8 @@ impl Protocol {
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         let escrowed = market.pool.sell(
             &env::predecessor_account_id(),
-            collateral_out, 
-            outcome_target, 
+            collateral_out,
+            outcome_target,
             max_shares_in.into()
         );
 
@@ -242,7 +242,7 @@ impl Protocol {
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
         collateral_token::transfer(
-            env::predecessor_account_id(), 
+            env::predecessor_account_id(),
             U128(collateral_out - escrowed),
             &market.pool.collateral_token_id,
             0,
@@ -260,7 +260,7 @@ impl Protocol {
         assert!(market.finalized, "ERR_NOT_FINALIZED");
 
         let payout = market.pool.payout(&env::predecessor_account_id(), &market.payout_numerator);
-        
+
         self.markets.insert(&market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
@@ -272,7 +272,7 @@ impl Protocol {
         );
         if payout > 0 {
                 collateral_token::transfer(
-                    env::predecessor_account_id(), 
+                    env::predecessor_account_id(),
                     payout.into(),
                     &market.pool.collateral_token_id,
                     0,
@@ -294,13 +294,13 @@ impl Protocol {
     ) -> Promise {
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
-    
+
         let initial_storage = env::storage_usage();
         let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
 
         let prom: Promise;
         match parsed_payload.function.as_str() {
-            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args), 
+            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args),
             "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
@@ -326,12 +326,12 @@ impl Protocol {
             Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
             None => ()
         };
-                
+
         market.payout_numerator = payout_numerator;
         market.finalized = true;
         self.markets.insert(&market_id.0, &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
-    
+
         logger::log_market_status(&market);
     }
 
@@ -358,6 +358,34 @@ impl Protocol {
         self.assert_gov();
         self.token_whitelist.push(to_add);
     }
+
+    // payable needed?
+    #[payable]
+    pub fn burn_outcome_tokens_redeem_collateral(
+        &mut self,
+        market_id: U64,
+        to_burn: U128
+    ) -> Promise {
+        let initial_storage = env::storage_usage();
+
+        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        market.pool.burn_outcome_tokens_redeem_collateral(
+            &env::predecessor_account_id(),
+            to_burn.into()
+        );
+
+        self.markets.insert(&market_id.into(), &market);
+
+        self.refund_storage(initial_storage, env::predecessor_account_id());
+
+        collateral_token::transfer(
+            env::predecessor_account_id(),
+            to_burn.into(),
+            &market.pool.collateral_token_id,
+            0,
+            GAS_BASE_COMPUTE
+        )
+    }
 }
 
 impl Protocol {
@@ -376,7 +404,7 @@ impl Protocol {
     }
 
     fn add_liquidity(
-        &mut self, 
+        &mut self,
         sender: &AccountId,
         vault_id: u64,
         total_in: u128,
@@ -393,22 +421,22 @@ impl Protocol {
             },
             None => None
         };
-           
+
         let mut market = self.markets.get(&parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         self.assert_collateral_token(&market.pool.collateral_token_id);
-        
+
         market.pool.add_liquidity(
-            &sender, 
+            &sender,
             total_in,
             weights_u128
         );
         self.markets.insert(&parsed_args.market_id.into(), &market);
 
         collateral_token::withdraw_from_vault(
-            vault_id, 
-            env::current_account_id(), 
+            vault_id,
+            env::current_account_id(),
             total_in.into(),
             &market.pool.collateral_token_id,
             0,
@@ -417,10 +445,10 @@ impl Protocol {
     }
 
     fn buy(
-        &mut self, 
+        &mut self,
         sender: &AccountId,
         vault_id: u64,
-        collateral_in: u128, 
+        collateral_in: u128,
         args: serde_json::Value,
     ) -> Promise {
         let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
@@ -428,19 +456,19 @@ impl Protocol {
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         self.assert_collateral_token(&market.pool.collateral_token_id);
-        
+
         market.pool.buy(
             &sender,
-            collateral_in, 
-            parsed_args.outcome_target, 
+            collateral_in,
+            parsed_args.outcome_target,
             parsed_args.min_shares_out.into()
         );
 
         self.markets.insert(&parsed_args.market_id.into(), &market);
 
         collateral_token::withdraw_from_vault(
-            vault_id, 
-            env::current_account_id(), 
+            vault_id,
+            env::current_account_id(),
             collateral_in.into(),
             &market.pool.collateral_token_id,
             0,
@@ -469,4 +497,4 @@ impl Protocol {
             Promise::new(sender_id).transfer(refund_amount);
         }
     }
-} 
+}
