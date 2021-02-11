@@ -83,7 +83,7 @@ impl Protocol {
     }
 
     pub fn get_pool_swap_fee(&self, market_id: U64) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_swap_fee())
     }
 
@@ -91,12 +91,12 @@ impl Protocol {
         &self,
         market_id: U64
     ) -> Vec<U128>{
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_POOL");
-        market.pool.get_pool_balances().iter().map(|&b| { b.into() }).collect()
+        let market = self.get_market_expect(market_id);
+        market.pool.get_pool_balances().into_iter().map(|b| b.into()).collect()
     }
     
     pub fn get_pool_token_balance(&self, market_id: U64, owner_id: &AccountId) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_pool_token_balance(owner_id))
     }
 
@@ -105,7 +105,7 @@ impl Protocol {
         market_id: U64, 
         outcome: u16
     ) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         market.pool.get_spot_price_sans_fee(outcome).into()
     }
 
@@ -115,7 +115,7 @@ impl Protocol {
         collateral_in: U128,
         outcome_target: u16
     ) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.calc_buy_amount(collateral_in.into(), outcome_target))
     }
 
@@ -125,17 +125,17 @@ impl Protocol {
         collateral_out: U128, 
         outcome_target: u16
     ) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.calc_sell_collateral_out(collateral_out.into(), outcome_target))
     }
 
     pub fn get_share_balance(&self, account_id: &AccountId, market_id: U64, outcome: u16) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_share_balance(account_id, outcome))
     }
 
     pub fn get_fees_withdrawable(&self, market_id: U64, account_id: &AccountId) -> U128 {
-        let market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_fees_withdrawable(account_id))
     }
 
@@ -363,6 +363,10 @@ impl Protocol {
 impl Protocol {
     fn assert_gov(&self) {
         assert_eq!(env::predecessor_account_id(), self.gov, "ERR_NO_GOVERNANCE_ADDRESS");
+    }
+
+    fn get_market_expect(&self, market_id: U64) -> Market {
+        self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
     }
 
     // TODO: make pure function
