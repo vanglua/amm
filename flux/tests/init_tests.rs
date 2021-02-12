@@ -11,5 +11,5 @@ fn test_contract_initiation() {
 #[test]
 #[should_panic(expected = "ERR_INVALID_ACCOUNT_ID")]
 fn test_contract_initiation_invalid_account_id() {
-    init(to_yocto("100"), "{}adjkbjksd_".to_string(), "carol".to_string());
+    init(to_yocto("100"), "carol".to_string());
 }

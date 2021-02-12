@@ -21,7 +21,6 @@ pub fn log_pool(pool: &Pool) {
             "cap_id": format!("p_{}", pool.id),
 			"params": {
                 "id": U64(pool.id),
-                "owner": pool.owner,
                 "outcomes": pool.outcomes,
                 "swap_fee": U128(pool.swap_fee),
                 "collateral_token_id": pool.collateral_token_id,
