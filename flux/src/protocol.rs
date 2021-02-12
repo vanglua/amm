@@ -369,7 +369,7 @@ impl Protocol {
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        market.pool.burn_outcome_tokens_redeem_collateral(
+        market.pool.burn_tokens_for_redemption(
             &env::predecessor_account_id(),
             to_burn.into()
         );

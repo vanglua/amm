@@ -197,23 +197,11 @@ impl Pool {
         fees
     }
 
-    // before token transfer
-    // withdraw fees
-
-    fn get_and_clear_balances(
-        &mut self,
-        account_id: &AccountId
-    ) -> Vec<u128> {
-        self.outcome_tokens.iter().map(|(_outcome, mut token)| {
-            token.remove_account(account_id).unwrap_or(0)
-        }).collect()
-    }
-
-    pub fn burn_outcome_tokens_redeem_collateral (
+    pub fn burn_tokens_for_redemption (
         &mut self,
         sender: &AccountId,
         to_burn: u128
-    ) {
+    )  {
         // Bone = token_denom
         // fold through self.outcome_tokens
             // burn
@@ -232,6 +220,17 @@ impl Pool {
         }
         // todo update
        //  self.accounts[env:predecessor_account_id()].entries
+    }
+
+    // move to view impl
+
+    fn get_and_clear_balances(
+        &mut self,
+        account_id: &AccountId
+    ) -> Vec<u128> {
+        self.outcome_tokens.iter().map(|(_outcome, mut token)| {
+            token.remove_account(account_id).unwrap_or(0)
+        }).collect()
     }
 
     fn mint_and_transfer_outcome_tokens(
