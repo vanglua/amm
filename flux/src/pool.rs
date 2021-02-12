@@ -214,6 +214,19 @@ impl Pool {
         sender: &AccountId,
         to_burn: u128
     ) {
+        // Bone = token_denom
+        // fold through self.outcome_tokens
+            // burn
+            // sum of add user.entries.spend / self.balance // u256 maths
+        
+        // match compare `sum` > `token_denom`
+            // If greater
+                // delta = token_denom - sum
+                // user.escrow_valid += delta * to_burn
+            //If smaller 
+                // detla = sum - token_denom
+                // user.escrow_invalid += delta * to_burn
+
         for (outcome, mut token) in self.outcome_tokens.iter() {
             token.burn(&env::predecessor_account_id(), to_burn);
         }
