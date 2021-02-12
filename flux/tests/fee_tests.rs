@@ -13,7 +13,7 @@ fn valid_market_lp_fee_test() {
     transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
     transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
 
-    let seed_amt = to_token_denom(1000);
+    let seed_amount = to_token_denom(1000);
     let buy_amt = to_token_denom(100);
     let target_price_a = U128(to_token_denom(5) / 10);
     let target_price_b = U128(to_token_denom(5) / 10);
@@ -24,19 +24,14 @@ fn valid_market_lp_fee_test() {
 
     assert_eq!(market_id, U64(0));
 
-    call!(
-        funder,
-        amm.seed_pool(market_id, U128(seed_amt), weights),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": Some(weights)
         }
     }).to_string();
-    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amt, publish_args);
+    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &funder.account_id())).unwrap_json();
 
@@ -70,13 +65,13 @@ fn valid_market_lp_fee_test() {
     transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
 
     // joiner
-    let join_pool_args = json!({
-        "function": "join_pool",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
             "market_id": market_id
         }
     }).to_string();
-    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amt, join_pool_args);
+    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let joiner_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &joiner.account_id())).unwrap_json();
 
@@ -115,7 +110,7 @@ fn invalid_market_lp_fee_test() {
     transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
     transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
     let funder_balance = get_balance(&token, funder.account_id());
-    let seed_amt = to_token_denom(1000);
+    let seed_amount = to_token_denom(1000);
     let buy_amt = to_token_denom(100);
     let target_price_a = U128(to_token_denom(5) / 10);
     let target_price_b = U128(to_token_denom(5) / 10);
@@ -126,19 +121,15 @@ fn invalid_market_lp_fee_test() {
 
     assert_eq!(market_id, U64(0));
 
-    call!(
-        funder,
-        amm.seed_pool(market_id, U128(seed_amt), weights),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": Some(weights)
         }
     }).to_string();
-    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amt, publish_args);
+
+    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &funder.account_id())).unwrap_json();
 
@@ -186,13 +177,13 @@ fn invalid_market_lp_fee_test() {
     );
 
     // joiner
-    let join_pool_args = json!({
-        "function": "join_pool",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
             "market_id": market_id
         }
     }).to_string();
-    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amt, join_pool_args);
+    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let joiner_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &joiner.account_id())).unwrap_json();
 

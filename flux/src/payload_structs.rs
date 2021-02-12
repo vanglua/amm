@@ -28,8 +28,9 @@ pub struct SeedPool {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct LPPool {
+pub struct AddLiquidity {
     pub market_id: U64,
+    pub weight_indication: Option<Vec<U128>>
 }
 
 #[derive(Serialize, Deserialize)]

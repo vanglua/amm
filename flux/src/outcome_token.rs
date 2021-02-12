@@ -25,6 +25,8 @@ pub struct MintableToken {
 }
 
 impl MintableToken {
+
+    // TODO: rm seed_nonce
     pub fn new(pool_id: u64, outcome_id: u16, seed_nonce: u64, initial_supply: u128) -> Self {
         let mut accounts: LookupMap<AccountId, Balance> = LookupMap::new(format!("balance:token:{}:{}:{}", pool_id, outcome_id, seed_nonce).as_bytes().to_vec()); 
         accounts.insert(&env::current_account_id(), &initial_supply);
@@ -94,7 +96,8 @@ impl Default for MintableFungibleToken {
 }
 
 impl MintableFungibleToken {
-    pub fn new(pool_id: u64, outcome_id: u16, seed_nonce: u64 ,initial_supply: u128,) -> Self {
+    // TODO: rm seed_nonce
+    pub fn new(pool_id: u64, outcome_id: u16, seed_nonce: u64, initial_supply: u128,) -> Self {
         Self {
             token: MintableToken::new(pool_id, outcome_id, seed_nonce, initial_supply),
         }
