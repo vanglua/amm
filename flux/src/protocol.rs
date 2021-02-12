@@ -22,6 +22,8 @@ use near_sdk::{
     },
 };
 
+use crate::helper::*;
+
 use crate::pool::Pool;
 use crate::logger;
 use crate::pool_factory;
@@ -156,7 +158,7 @@ impl Protocol {
         let market_id = self.markets.len();
         assert!(self.token_whitelist.contains(&collateral_token_id), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
-        assert!(end_time > self.ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
+        assert!(end_time > ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
         assert!(swap_fee == 0 || (swap_fee <= MAX_FEE && swap_fee >= MIN_FEE), "ERR_INVALID_FEE");
         let initial_storage = env::storage_usage();
 
@@ -230,7 +232,7 @@ impl Protocol {
         let collateral_out: u128 = collateral_out.into();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         let escrowed = market.pool.sell(
             &env::predecessor_account_id(),
             collateral_out, 
@@ -323,7 +325,11 @@ impl Protocol {
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
-            Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
+            Some(v) => {
+                let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
+                assert_eq!(sum, TOKEN_DENOM, "ERR_INVALID_PAYOUT_SUM");
+                assert_eq!(v.len(), market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR");
+            },
             None => ()
         };
                 
@@ -369,16 +375,6 @@ impl Protocol {
         self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
     }
 
-    // TODO: make pure function
-    fn assert_collateral_token(&self, collateral_token: &AccountId) {
-        assert_eq!(&env::predecessor_account_id(), collateral_token, "ERR_INVALID_COLLATERAL");
-    }
-
-    // TODO: make pure function
-    fn ns_to_ms(&self, ns_timestamp: u64) -> u64 {
-        ns_timestamp / 1_000_000
-    }
-
     fn add_liquidity(
         &mut self, 
         sender: &AccountId,
@@ -400,8 +396,8 @@ impl Protocol {
            
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
-        self.assert_collateral_token(&market.pool.collateral_token_id);
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        assert_collateral_token(&market.pool.collateral_token_id);
         
         market.pool.add_liquidity(
             &sender, 
@@ -430,8 +426,8 @@ impl Protocol {
         let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
-        self.assert_collateral_token(&market.pool.collateral_token_id);
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        assert_collateral_token(&market.pool.collateral_token_id);
         
         market.pool.buy(
             &sender,
