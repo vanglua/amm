@@ -368,13 +368,13 @@ impl Protocol {
     ) -> Promise {
         let initial_storage = env::storage_usage();
 
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         market.pool.burn_outcome_tokens_redeem_collateral(
             &env::predecessor_account_id(),
             to_burn.into()
         );
 
-        self.markets.insert(&market_id.into(), &market);
+        self.markets.replace(market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
