@@ -51,7 +51,7 @@ impl MintableToken {
     pub fn burn(&mut self, account_id: &AccountId, amount: u128) {
         let mut balance = self.accounts.get(&account_id).unwrap_or(0);
 
-        assert!(balance >= amount, "ERR_LOW_BALANCE");
+        assert!(balance >= amount, "ERR_INSUFFICIENT_BALANCE");
 
         balance -= amount;
         self.accounts.insert(account_id, &balance);

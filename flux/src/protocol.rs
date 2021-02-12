@@ -380,7 +380,7 @@ impl Protocol {
 
         collateral_token::transfer(
             env::predecessor_account_id(),
-            to_burn.into(),
+            to_burn,
             &market.pool.collateral_token_id,
             0,
             GAS_BASE_COMPUTE

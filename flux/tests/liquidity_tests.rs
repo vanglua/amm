@@ -258,19 +258,23 @@ fn join_zero_liq_test() {
 }
 
 #[test]
-fn add_liquidty_redeem() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+fn add_liquidity_redeem() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+
+    // Fund Bob
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
 
-    let market_id: U64 = create_market(&alice, &amm, 2, Some(U128(0)));
-
+    // Create / validate market
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     assert_eq!(market_id, U64(0));
 
+    // Seed params
     let seed_amount = to_token_denom(10);
     let half = U128(to_token_denom(5) / 10);
     let weights = vec![half, half];
 
+    // Add liquidity
     let add_liquidity_args = json!({
         "function": "add_liquidity",
         "args": {
@@ -278,35 +282,35 @@ fn add_liquidty_redeem() {
             "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, add_liquidity_args);
 
-    let redeem_call = call!(
-        alice,
-        amm.burn_outcome_tokens_redeem_collateral(market_id, U128(to_token_denom(1))),
+    // Exit pool
+    let bob_exit_res = call!(
+        bob,
+        amm.exit_pool(market_id, U128(seed_amount)),
         deposit = STORAGE_AMOUNT
     );
-    panic!("token initiation failed: {:?}", redeem_call);
+    assert!(bob_exit_res.is_ok());
+
+    // Redeem liquidity
+    let redeem_call = call!(
+        bob,
+        amm.burn_outcome_tokens_redeem_collateral(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
     assert!(redeem_call.is_ok());
 
-
-
-
-    // let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
-    // assert_eq!(pool_token_balance, U128(seed_amount));
-    // let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    // assert_eq!(seeder_balance, to_yocto("1") - seed_amount - transfer_amount);
-    // let amm_collateral_balance = get_balance(&token, "amm".to_string());
-    // assert_eq!(amm_collateral_balance, seed_amount);
-
-    // let burn_args = json!({
-    //     "function": "burn_outcome_tokens_redeem_collateral",
-    //     "args": {
-    //         "market_id": market_id,
-    //         "to_burn": U128(to_token_denom(5)),
-    //     }
-    // }).to_string();
-    // transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, burn_args);
-
-    // let pool_token_balance_after_join: U128 = view!(amm.get_pool_token_balance(market_id, "alice")).unwrap_json();
-    // assert_eq!(pool_token_balance_after_join, U128(to_token_denom(5)));
+    // Assert pool token balance
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &bob.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(0));
+ 
+    // Assert collateral balance
+    let collateral_balance = get_balance(&token, bob.account_id());
+    assert_eq!(collateral_balance, transfer_amount);
+    
+    // Assert if shares are burned
+    let outcome_balance_0: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
+    let outcome_balance_1: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 1)).unwrap_json();
+    assert_eq!(outcome_balance_0, U128(0));
+    assert_eq!(outcome_balance_1, U128(0));
 }
