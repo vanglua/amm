@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::pedantic)]
-#![allow(dead_code, clippy::too_many_lines, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
+#![allow(dead_code, clippy::must_use_candidate, clippy::too_many_lines, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
 #[cfg(feature = "wee_alloc")]
 
 #[cfg(target = "wasm32")]

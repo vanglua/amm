@@ -11,13 +11,14 @@ use near_sdk::{
     PanicOnDefault,
     json_types::{
         U128, 
-        U64
+        U64,
+        ValidAccountId
     },
     serde_json,
-    AccountId, 
+    AccountId,
     env,
     collections::{
-        LookupMap
+        Vector
     },
 };
 
@@ -40,6 +41,9 @@ pub struct Market {
     pub finalized: bool,
 }
 
+impl Market {
+}
+
 #[ext_contract]
 pub trait CollateralToken {
     fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: AccountId, amount: U128);
@@ -51,8 +55,7 @@ pub trait CollateralToken {
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
-    markets: LookupMap<u64, Market>,
-    id: u64, // Incrementing number that's used to define a pool's id
+    markets: Vector<Market>,
     token_whitelist: Vec<AccountId>
 }
 
@@ -60,20 +63,18 @@ pub struct Protocol {
 impl Protocol {
 
     /**
-     * @notice Initialize the contract by setting the owner
-     * @param owner The `account_id` that's going to have owner privileges
+     * @notice Initialize the contract by setting the
+     * @param gov is the account_id of the account with governance privilages
+     * @param token_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
-    pub fn init(owner: AccountId, gov: AccountId, token_whitelist: Vec<AccountId>) -> Self {
+    pub fn init(gov: ValidAccountId, token_whitelist: Vec<ValidAccountId>) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
-        assert!(env::is_valid_account_id(owner.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
-        assert!(env::is_valid_account_id(gov.as_bytes()), "ERR_INVALID_ACCOUNT_ID");
         
         Self {
-            gov,
-            markets: LookupMap::new(b"markets".to_vec()),
-            id: 0,
-            token_whitelist
+            gov: gov.into(),
+            markets: Vector::new(b"m".to_vec()),
+            token_whitelist: token_whitelist.into_iter().map(|t| t.into()).collect()
         }
     }
 
@@ -82,7 +83,7 @@ impl Protocol {
     }
 
     pub fn get_pool_swap_fee(&self, market_id: U64) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_swap_fee())
     }
 
@@ -90,12 +91,12 @@ impl Protocol {
         &self,
         market_id: U64
     ) -> Vec<U128>{
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_POOL");
-        market.pool.get_pool_balances().iter().map(|b| { U128(*b) }).collect()
+        let market = self.get_market_expect(market_id);
+        market.pool.get_pool_balances().into_iter().map(|b| b.into()).collect()
     }
     
     pub fn get_pool_token_balance(&self, market_id: U64, owner_id: &AccountId) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_pool_token_balance(owner_id))
     }
 
@@ -104,7 +105,7 @@ impl Protocol {
         market_id: U64, 
         outcome: u16
     ) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         market.pool.get_spot_price_sans_fee(outcome).into()
     }
 
@@ -114,7 +115,7 @@ impl Protocol {
         collateral_in: U128,
         outcome_target: u16
     ) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.calc_buy_amount(collateral_in.into(), outcome_target))
     }
 
@@ -124,17 +125,17 @@ impl Protocol {
         collateral_out: U128, 
         outcome_target: u16
     ) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.calc_sell_collateral_out(collateral_out.into(), outcome_target))
     }
 
     pub fn get_share_balance(&self, account_id: &AccountId, market_id: U64, outcome: u16) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_share_balance(account_id, outcome))
     }
 
     pub fn get_fees_withdrawable(&self, market_id: U64, account_id: &AccountId) -> U128 {
-        let market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let market = self.get_market_expect(market_id);
         U128(market.pool.get_fees_withdrawable(account_id))
     }
 
@@ -152,7 +153,7 @@ impl Protocol {
     ) -> U64 {
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
-        let market_id = self.id;
+        let market_id = self.markets.len();
         assert!(self.token_whitelist.contains(&collateral_token_id), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
         assert!(end_time > self.ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
@@ -179,9 +180,8 @@ impl Protocol {
         logger::log_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
         
-        self.markets.insert(&market_id, &market);
+        self.markets.push(&market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
-        self.id += 1;
         market_id.into()
     }
 
@@ -193,13 +193,13 @@ impl Protocol {
     ) -> PromiseOrValue<bool> {
         let initial_storage = env::storage_usage();
 
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         let fees_earned = market.pool.exit_pool(
             &env::predecessor_account_id(), 
             total_in.into()
         );
         
-        self.markets.insert(&market_id.into(), &market);
+        self.markets.replace(market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
@@ -228,7 +228,7 @@ impl Protocol {
     ) -> Promise {
         let initial_storage = env::storage_usage();
         let collateral_out: u128 = collateral_out.into();
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         let escrowed = market.pool.sell(
@@ -238,7 +238,7 @@ impl Protocol {
             max_shares_in.into()
         );
 
-        self.markets.insert(&market_id.into(), &market);
+        self.markets.replace(market_id.into(), &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
         collateral_token::transfer(
@@ -256,12 +256,12 @@ impl Protocol {
         market_id: U64
     ) -> Promise {
         let initial_storage = env::storage_usage();
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(market.finalized, "ERR_NOT_FINALIZED");
 
         let payout = market.pool.payout(&env::predecessor_account_id(), &market.payout_numerator);
         
-        self.markets.insert(&market_id.into(), &market);
+        self.markets.replace(market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
@@ -320,7 +320,7 @@ impl Protocol {
     ) {
         let initial_storage = env::storage_usage();
         self.assert_gov();
-        let mut market = self.markets.get(&market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
             Some(v) => assert!(v.len() == market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR"),
@@ -329,7 +329,7 @@ impl Protocol {
                 
         market.payout_numerator = payout_numerator;
         market.finalized = true;
-        self.markets.insert(&market_id.0, &market);
+        self.markets.replace(market_id.into(), &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
     
         logger::log_market_status(&market);
@@ -337,32 +337,36 @@ impl Protocol {
 
     pub fn set_gov(
         &mut self,
-        new_gov: AccountId
+        new_gov: ValidAccountId
     ) {
         self.assert_gov();
-        self.gov = new_gov;
+        self.gov = new_gov.into();
     }
 
     pub fn set_token_whitelist(
         &mut self,
-        whitelist: Vec<AccountId>
+        whitelist: Vec<ValidAccountId>
     ) {
         self.assert_gov();
-        self.token_whitelist = whitelist;
+        self.token_whitelist = whitelist.into_iter().map(|t| t.into()).collect();
     }
 
     pub fn add_to_token_whitelist(
         &mut self,
-        to_add: AccountId
+        to_add: ValidAccountId
     ) {
         self.assert_gov();
-        self.token_whitelist.push(to_add);
+        self.token_whitelist.push(to_add.into());
     }
 }
 
 impl Protocol {
     fn assert_gov(&self) {
         assert_eq!(env::predecessor_account_id(), self.gov, "ERR_NO_GOVERNANCE_ADDRESS");
+    }
+
+    fn get_market_expect(&self, market_id: U64) -> Market {
+        self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
     }
 
     // TODO: make pure function
@@ -394,7 +398,7 @@ impl Protocol {
             None => None
         };
            
-        let mut market = self.markets.get(&parsed_args.market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         self.assert_collateral_token(&market.pool.collateral_token_id);
@@ -404,7 +408,7 @@ impl Protocol {
             total_in,
             weights_u128
         );
-        self.markets.insert(&parsed_args.market_id.into(), &market);
+        self.markets.replace(parsed_args.market_id.into(), &market);
 
         collateral_token::withdraw_from_vault(
             vault_id, 
@@ -424,7 +428,7 @@ impl Protocol {
         args: serde_json::Value,
     ) -> Promise {
         let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
-        let mut market = self.markets.get(&parsed_args.market_id.into()).expect("ERR_NO_MARKET");
+        let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > self.ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         self.assert_collateral_token(&market.pool.collateral_token_id);
@@ -436,7 +440,7 @@ impl Protocol {
             parsed_args.min_shares_out.into()
         );
 
-        self.markets.insert(&parsed_args.market_id.into(), &market);
+        self.markets.replace(parsed_args.market_id.into(), &market);
 
         collateral_token::withdraw_from_vault(
             vault_id, 

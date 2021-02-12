@@ -33,18 +33,16 @@ pub struct LPEntries {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    entries: LookupMap<u16, u128>, // Stores outcome => spend
+    entries: LookupMap<u16, u128>, // Stores outcome => spend 
     lp_entries: LookupMap<u16, u128>,
     resolution_escrow: ResolutionEscrow
 }
 
-
-
 impl Account {
     pub fn new(pool_id: u64, sender: &AccountId) -> Self {
         Account {
-            entries: LookupMap::new(format!("pool:{}:account:{}", pool_id, sender).as_bytes().to_vec()),
-            lp_entries: LookupMap::new(format!("pool:{}:lp:{}", pool_id, sender).as_bytes().to_vec()),
+            entries: LookupMap::new(format!("p{}ae{}", pool_id, sender).as_bytes().to_vec()),
+            lp_entries: LookupMap::new(format!("p{}lp{}", pool_id, sender).as_bytes().to_vec()),
             resolution_escrow: ResolutionEscrow {
                 valid: 0,
                 invalid: 0
@@ -57,7 +55,6 @@ impl Account {
 pub struct Pool {
     pub id: u64,
     pub seed_nonce: u64,
-    pub owner: AccountId, // TODO: rm
     pub collateral_token_id: AccountId,
     pub lp_entries: LookupMap<AccountId, LPEntries>,
     pub outcomes: u16,
@@ -68,7 +65,6 @@ pub struct Pool {
     pub total_withdrawn_fees: u128,
     pub fee_pool_weight: u128,
     pub accounts: LookupMap<AccountId, Account>,
-    pub public: bool, // TODO: rm
 }
 
 impl Pool {
@@ -85,18 +81,16 @@ impl Pool {
         Self {
             id: pool_id,
             seed_nonce: 1,
-            owner: sender,
             collateral_token_id,
-            lp_entries: LookupMap::new(format!("pool:{}:lp_entries", pool_id).as_bytes().to_vec()),
+            lp_entries: LookupMap::new(format!("p{}lpe", pool_id).as_bytes().to_vec()),
             outcomes,
-            outcome_tokens: UnorderedMap::new(format!("pool_:{}:outcome_tokens", pool_id).as_bytes().to_vec()),
-            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0, 0), // TODO: rm seed_nonce
+            outcome_tokens: UnorderedMap::new(format!("p{}ot", pool_id).as_bytes().to_vec()),
+            pool_token: MintableFungibleToken::new(pool_id, outcomes, 0),
             swap_fee,
-            withdrawn_fees: LookupMap::new(format!("pool:{}:withdrawn_fees", pool_id).as_bytes().to_vec()),
+            withdrawn_fees: LookupMap::new(format!("p{}wf", pool_id).as_bytes().to_vec()),
             total_withdrawn_fees: 0,
             fee_pool_weight: 0,
-            accounts: LookupMap::new(format!("pool:{}:accounts", pool_id).as_bytes().to_vec()),
-            public: false,
+            accounts: LookupMap::new(format!("pool{}a", pool_id).as_bytes().to_vec()),
         }
 
     }
@@ -241,7 +235,7 @@ impl Pool {
             // TODO: rm seed_nonce
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, self.seed_nonce, 0) });
+            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, 0) });
             
             outcome_token.mint(& env::current_account_id(), total_in);
 

@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn pool_initial_pricing_test() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
     let seed_amount = to_token_denom(100);
     let half = to_token_denom(5) / 10;
     let forty = to_token_denom(4) / 10;
@@ -54,7 +54,7 @@ fn pool_initial_pricing_test() {
 #[test]
 fn multi_outcome_pool_pricing_test() {
     // Even pool
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
     let seed_amount = to_token_denom(100);
     
     let market_id = create_market(&alice, &amm, 3, Some(U128(0)));
@@ -135,7 +135,7 @@ fn multi_outcome_pool_pricing_test() {
 
 #[test]
 fn fee_test_calc() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
 
     let half = to_token_denom(1) / 2;
     let seed_amount = to_token_denom(100);

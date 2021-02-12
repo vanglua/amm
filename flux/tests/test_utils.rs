@@ -1,10 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
-
+use std::convert::TryInto;
 use near_sdk::{
     AccountId,
     json_types::{
         U64,
-        U128
+        U128,
+        ValidAccountId
     },
     serde_json::json
 };
@@ -43,10 +44,10 @@ near_sdk_sim::lazy_static! {
 
 pub fn init(
     initial_balance: u128,
-    owner_id: String,
-    gov_id: String,
+    gov_id: AccountId,
 ) -> (UserAccount, ContractAccount<ProtocolContract>, UserAccount, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
+
     // deploy amm
     let amm_contract = deploy!(
         // Contract Proxy
@@ -59,8 +60,10 @@ pub fn init(
         signer_account: master_account,
         deposit: to_yocto("1000"),
         // init method
-        init_method: init(owner_id.to_string(), gov_id.to_string(), vec!["token".to_string()])
-
+        init_method: init(
+            gov_id.try_into().unwrap(),
+            vec!["token".try_into().unwrap()]
+        )
     );
 
     let token_contract = master_account.create_user("token".to_string(), to_yocto("100"));
@@ -71,7 +74,7 @@ pub fn init(
         .deploy_contract((&TOKEN_WASM_BYTES).to_vec())
         .submit();
 
-    init_token(&token_contract, owner_id.to_string(), initial_balance);
+    init_token(&token_contract, "alice".to_string(), initial_balance);
     
     let alice = master_account.create_user("alice".to_string(), to_yocto("1000"));
     
