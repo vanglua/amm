@@ -6,72 +6,100 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn pool_initial_pricing_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
     let seed_amount = to_token_denom(100);
     let half = to_token_denom(5) / 10;
     let forty = to_token_denom(4) / 10;
     let sixty = to_token_denom(6) / 10;
 
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
-
     assert_eq!(market_id, U64(0));
 
-    let even_seed_pool_res = call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(half), U128(half)]),
-        deposit = STORAGE_AMOUNT
-    );
+    let even_weights = Some(vec![U128(half), U128(half)]);
+    let uneven_weights = Some(vec![U128(forty), U128(sixty)]);
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": even_weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let even_price: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
     assert_eq!(u128::from(even_price), half);
     
-    let uneven_seed_pool_res = call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(forty), U128(sixty)]),
-        deposit = STORAGE_AMOUNT
-    );
+    let market_id_2 = create_market(&alice, &amm, 2, Some(U128(0)));
+
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id_2,
+            "weight_indication": uneven_weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let expected_0 = to_token_denom(6) / 10;
     let expected_1 = to_token_denom(4) / 10;
 
-    let price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
+    let price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id_2, 0)).unwrap_json();
     assert_eq!(u128::from(price_0), expected_0);
-    let price_1: U128 = view!(amm.get_spot_price_sans_fee(market_id, 1)).unwrap_json();
+    let price_1: U128 = view!(amm.get_spot_price_sans_fee(market_id_2, 1)).unwrap_json();
     assert_eq!(u128::from(price_1), expected_1);
 }
 
 #[test]
 fn multi_outcome_pool_pricing_test() {
     // Even pool
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
     let seed_amount = to_token_denom(100);
     
     let market_id = create_market(&alice, &amm, 3, Some(U128(0)));
     
     let third = to_token_denom(1) / 3;
-    
-    let res = call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(third), U128(third), U128(third + 1)]),
-        deposit = STORAGE_AMOUNT
-    );
-    
+    let even_weights = Some(vec![U128(third), U128(third), U128(third + 1)]);
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": even_weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+
     let even_price: U128 = view!(
         amm.get_spot_price_sans_fee(market_id, 1)
     ).unwrap_json();
 
     assert_eq!(even_price, U128(333_333_333_333_333_334));
+
+    let alice_exit_res = call!(
+        alice,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+
+    assert!(alice_exit_res.is_ok());
     
     // Uneven pool
     let twenty = to_token_denom(2) / 10;
     let sixty = to_token_denom(6) / 10;
     let collat = to_token_denom(100);
+
+    let uneven_weights = Some(vec![U128(twenty), U128(twenty), U128(sixty)]);
     
-    call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(twenty), U128(twenty), U128(sixty)]),
-        deposit = STORAGE_AMOUNT
-    );
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": uneven_weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let bal_0 = test_utils::math::mul_u128(twenty, collat);
     let bal_1 = test_utils::math::mul_u128(twenty, collat);
@@ -107,18 +135,22 @@ fn multi_outcome_pool_pricing_test() {
 
 #[test]
 fn fee_test_calc() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
 
     let half = to_token_denom(1) / 2;
     let seed_amount = to_token_denom(100);
     
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
+    let weights = Some(vec![U128(half), U128(half)]);
 
-    call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(half), U128(half)]),
-        deposit = STORAGE_AMOUNT
-    );
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
     
     let even_price_wrapped: U128 = view!(amm.get_spot_price_sans_fee(market_id, 1)).unwrap_json();
     let swap_fee_wrapped: U128 = view!(amm.get_pool_swap_fee(market_id)).unwrap_json();

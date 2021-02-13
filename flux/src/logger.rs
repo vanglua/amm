@@ -21,14 +21,11 @@ pub fn log_pool(pool: &Pool) {
             "cap_id": format!("p_{}", pool.id),
 			"params": {
                 "id": U64(pool.id),
-                "seed_nonce": U64(pool.seed_nonce),
-                "owner": pool.owner,
                 "outcomes": pool.outcomes,
                 "swap_fee": U128(pool.swap_fee),
                 "collateral_token_id": pool.collateral_token_id,
                 "total_withdrawn_fees": U128(pool.total_withdrawn_fees),
                 "fee_pool_weight": U128(pool.fee_pool_weight),
-                "public": pool.public,
                 "block_height": U64(env::block_index()),
 			}
 		})
@@ -208,10 +205,12 @@ fn log_to_escrow(escrow_type: String, market_id: u64, sender: &AccountId, amount
     env::log(
         json!({
             "type": "escrow_statuses",
+            "action": "update",
+            "cap_id": format!("es_{}_{}", market_id, sender),
             "params": {
                 "market_id": U64(market_id),
-                "claimer": sender,
-                "payout": U128(amount),
+                "account_id": sender,
+                "total_amount": U128(amount),
                 "type": escrow_type,
             }
         })

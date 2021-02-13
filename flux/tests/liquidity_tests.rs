@@ -5,8 +5,8 @@ use near_sdk::serde_json::json;
 use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
-fn join_pool_even_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+fn add_liquidity_even_liq_test() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
 
@@ -15,21 +15,16 @@ fn join_pool_even_liq_test() {
     assert_eq!(market_id, U64(0));
 
     let seed_amount = to_token_denom(10);
-    let half = to_token_denom(5) / 10;
-
-    let seed_pool_res = call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(half), U128(half)]),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let half = U128(to_token_denom(5) / 10);
+    let weights = vec![half, half];
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, publish_args);
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
     assert_eq!(pool_token_balance, U128(seed_amount));
@@ -39,7 +34,7 @@ fn join_pool_even_liq_test() {
     assert_eq!(amm_collateral_balance, seed_amount);
 
     let join_args = json!({
-        "function": "join_pool",
+        "function": "add_liquidity",
         "args": {
             "market_id": market_id,
         }
@@ -56,9 +51,9 @@ fn join_pool_even_liq_test() {
 }
 
 #[test]
-fn join_pool_uneven_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+fn add_liquidity_uneven_liq_test() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
 
@@ -72,19 +67,14 @@ fn join_pool_uneven_liq_test() {
     let weights = calc_weights_from_price(vec![target_price_a, target_price_b_c,target_price_b_c]);
     let seed_amount = to_token_denom(100);
 
-    let seed_pool_res = call!(
-        alice,
-        amm.seed_pool(market_id, U128(seed_amount), weights),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, publish_args);
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
     let price_1: U128 = view!(amm.get_spot_price_sans_fee(market_id, 1)).unwrap_json();
@@ -108,7 +98,7 @@ fn join_pool_uneven_liq_test() {
     let creator_pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
     // Bob joins pool
     let join_args = json!({
-        "function": "join_pool",
+        "function": "add_liquidity",
         "args": {
             "market_id": market_id,
         }
@@ -126,7 +116,7 @@ fn join_pool_uneven_liq_test() {
 
 #[test]
 fn multiple_pool_exits_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "alice".to_string(), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
@@ -143,27 +133,22 @@ fn multiple_pool_exits_test() {
 
     let buy_amount = to_token_denom(10);
 
-    let half = to_token_denom(5) / 10;
-
-    let seed_pool_res = call!(
-        bob,
-        amm.seed_pool(market_id, U128(seed_amount), vec![U128(half), U128(half)]),
-        deposit = STORAGE_AMOUNT
-    );
-
-    let publish_args = json!({
-        "function": "publish",
+    let half = U128(to_token_denom(5) / 10);
+    let weights = Some(vec![half, half]);
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
         "args": {
-            "market_id": market_id
+            "market_id": market_id,
+            "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, publish_args);
+    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &bob.account_id())).unwrap_json();
     assert_eq!(pool_token_balance, U128(seed_amount));
 
     let join_args = json!({
-        "function": "join_pool",
+        "function": "add_liquidity",
         "args": {
             "market_id": market_id,
         }
@@ -201,7 +186,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res1 = call!(
         alice,
@@ -209,7 +193,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res1.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res2 = call!(
         alice,
@@ -217,7 +200,6 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res2.is_ok());
-    println!("{:?}", alice_exit_res);
 
     let alice_exit_res3 = call!(
         alice,
@@ -225,10 +207,53 @@ fn multiple_pool_exits_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(alice_exit_res3.is_ok());
-    println!("{:?}", alice_exit_res);
 
     // assert pool balances
     let alice_pool_token_balance_post_exit: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
     assert_eq!(alice_pool_token_balance_post_exit, U128(u128::from(alice_pool_token_balance_pre_exit) - exit_amount0 - exit_amount1 -exit_amount2 - exit_amount3));
+}
+
+#[test]
+fn join_zero_liq_test() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
+    let transfer_amount = to_token_denom(100);
+    transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
+    assert_eq!(market_id, U64(0));
+
+    let seed_amount = to_token_denom(100);
+    let join_amount0 = to_token_denom(500);
+ 
+    let half = U128(to_token_denom(5) / 10);
+    let weights = Some(vec![half, half]);
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(seed_amount));
+
+    let seed_exit_res = call!(
+        alice,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(seed_exit_res.is_ok());
+
+    let join_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    let join_res = transfer_with_vault(&token, &alice, "amm".to_string(), join_amount0, join_args.to_string());
+    assert!(join_res.is_ok());
 }
 
