@@ -205,10 +205,12 @@ fn log_to_escrow(escrow_type: String, market_id: u64, sender: &AccountId, amount
     env::log(
         json!({
             "type": "escrow_statuses",
+            "action": "update",
+            "cap_id": format!("es_{}_{}", market_id, sender),
             "params": {
                 "market_id": U64(market_id),
-                "claimer": sender,
-                "payout": U128(amount),
+                "account_id": sender,
+                "total_amount": U128(amount),
                 "type": escrow_type,
             }
         })
