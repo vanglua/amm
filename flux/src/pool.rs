@@ -202,24 +202,43 @@ impl Pool {
         sender: &AccountId,
         to_burn: u128
     )  {
-        // Bone = token_denom
-        // fold through self.outcome_tokens
-            // burn
-            // sum of add user.entries.spend / self.balance // u256 maths
-        
-        // match compare `sum` > `token_denom`
-            // If greater
-                // delta = token_denom - sum
-                // user.escrow_valid += delta * to_burn
-            //If smaller 
-                // detla = sum - token_denom
-                // user.escrow_invalid += delta * to_burn
+        let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCES");
 
-        for (outcome, mut token) in self.outcome_tokens.iter() {
-            token.burn(&env::predecessor_account_id(), to_burn);
+        // TODO: check if burned tokens are stored correctly and don't cause inconsistent state errors
+        let avg_price_paid = self.outcome_tokens.iter().fold(0, |sum, (outcome, mut token)| {
+
+            // Calc avg price per outcome
+            let spent_on_outcome = account.entries.get(&outcome).expect(format!("ERR_NO_ENTRIES_{}", outcome).as_str());
+            let user_balance = token.get_balance(sender);
+            // assert!(user_balance > 0, format!("ERR_NO_BALANCE_OUTCOME_{}", outcome).as_str());
+            let price_paid_per_share = math::div_u128(spent_on_outcome, user_balance);
+
+            // subtract sold off tokens from entries
+            let new_entry_balance = spent_on_outcome - math::mul_u128(price_paid_per_share, to_burn);
+            account.entries.insert(&outcome, &new_entry_balance);
+
+            // Burn outcome tokens accordingly 
+            token.burn(sender, to_burn);
+
+            sum + price_paid_per_share
+        });
+
+        // If the user paid less than 1 they have the right to claim the difference if the market turns out valid
+        // If the users paid more than 1 they will have the right to claim the difference if the market turns out invalid
+        match avg_price_paid.cmp(&constants::TOKEN_DENOM) {
+            std::cmp::Ordering::Greater => {
+                let delta = avg_price_paid - constants::TOKEN_DENOM;
+                account.resolution_escrow.invalid += math::mul_u128(delta, to_burn);
+            },
+            std::cmp::Ordering::Less => {
+                let delta = constants::TOKEN_DENOM - avg_price_paid;
+                account.resolution_escrow.valid += math::mul_u128(delta, to_burn);
+            }, 
+            _ => ()
         }
-        // todo update
-       //  self.accounts[env:predecessor_account_id()].entries
+
+        // Store updated account
+        self.accounts.insert(sender, &account);
     }
 
     // move to view impl
