@@ -210,7 +210,7 @@ impl Pool {
             // Calc avg price per outcome
             let spent_on_outcome = account.entries.get(&outcome).expect(format!("ERR_NO_ENTRIES_{}", outcome).as_str());
             let user_balance = token.get_balance(sender);
-            // assert!(user_balance > 0, format!("ERR_NO_BALANCE_OUTCOME_{}", outcome).as_str());
+            assert!(user_balance > 0, "ERR_NO_BALANCE_OUTCOME_{}", outcome);
             let price_paid_per_share = math::div_u128(spent_on_outcome, user_balance);
 
             // subtract sold off tokens from entries
