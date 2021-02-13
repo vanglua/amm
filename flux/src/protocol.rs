@@ -43,13 +43,9 @@ pub struct Market {
     pub finalized: bool,
 }
 
-impl Market {
-}
-
 #[ext_contract]
 pub trait CollateralToken {
-    fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: AccountId, amount: U128);
-    fn transfer(&mut self, receiver_id: AccountId, amount: U128);
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 
@@ -286,8 +282,9 @@ impl Protocol {
     }
 
 
+    // Callback for collateral tokens
     #[payable]
-    pub fn on_receive_with_vault(
+    pub fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
         vault_id: u64,
@@ -295,8 +292,6 @@ impl Protocol {
         payload: String,
     ) -> Promise {
         let amount: u128 = amount.into();
-        assert!(amount > 0, "ERR_ZERO_AMOUNT");
-    
         let initial_storage = env::storage_usage();
         let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
 
