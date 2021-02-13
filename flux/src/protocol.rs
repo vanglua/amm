@@ -203,9 +203,10 @@ impl Protocol {
 
         if fees_earned > 0 {
             PromiseOrValue::Promise(
-                collateral_token::transfer(
+                collateral_token::ft_transfer(
                     env::predecessor_account_id(), 
                     fees_earned.into(),
+                    None,
                     &market.pool.collateral_token_id,
                     0,
                     GAS_BASE_COMPUTE
@@ -239,9 +240,10 @@ impl Protocol {
         self.markets.replace(market_id.into(), &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::transfer(
+        collateral_token::ft_transfer(
             env::predecessor_account_id(), 
             U128(collateral_out - escrowed),
+            None,
             &market.pool.collateral_token_id,
             0,
             GAS_BASE_COMPUTE
@@ -269,9 +271,10 @@ impl Protocol {
             payout
         );
         if payout > 0 {
-                collateral_token::transfer(
+                collateral_token::ft_transfer(
                     env::predecessor_account_id(), 
                     payout.into(),
+                    None,
                     &market.pool.collateral_token_id,
                     0,
                     GAS_BASE_COMPUTE
@@ -290,20 +293,19 @@ impl Protocol {
         vault_id: u64,
         amount: U128,
         payload: String,
-    ) -> Promise {
+    ) -> U128 {
         let amount: u128 = amount.into();
         let initial_storage = env::storage_usage();
         let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
 
-        let prom: Promise;
-        match parsed_payload.function.as_str() {
-            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args), 
-            "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
+        let amount_used = match parsed_payload.function.as_str() {
+            "add_liquidity" => self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args), 
+            "buy" => self.buy(&sender_id, vault_id, amount, parsed_payload.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
 
         self.refund_storage(initial_storage, sender_id);
-        prom
+        amount_used.into()
     }
 
     /*** Gov setters ***/
@@ -376,7 +378,7 @@ impl Protocol {
         vault_id: u64,
         total_in: u128,
         args: serde_json::Value,
-    ) -> Promise {
+    ) -> u128 {
         let parsed_args: payload_structs::AddLiquidity = payload_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
@@ -401,14 +403,8 @@ impl Protocol {
         );
         self.markets.replace(parsed_args.market_id.into(), &market);
 
-        collateral_token::withdraw_from_vault(
-            vault_id, 
-            env::current_account_id(), 
-            total_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
+        // If we get to this point, all collateral is used
+        0
     }
 
     fn buy(
@@ -417,7 +413,7 @@ impl Protocol {
         vault_id: u64,
         collateral_in: u128, 
         args: serde_json::Value,
-    ) -> Promise {
+    ) -> u128 {
         let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
@@ -433,14 +429,8 @@ impl Protocol {
 
         self.markets.replace(parsed_args.market_id.into(), &market);
 
-        collateral_token::withdraw_from_vault(
-            vault_id, 
-            env::current_account_id(), 
-            collateral_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
+        // If we get to this point, all collateral is used
+        0
     }
 
     fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
