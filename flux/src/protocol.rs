@@ -315,8 +315,8 @@ impl Protocol {
         market_id: U64,
         payout_numerator: Option<Vec<U128>>
     ) {
-        let initial_storage = env::storage_usage();
         self.assert_gov();
+        let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
