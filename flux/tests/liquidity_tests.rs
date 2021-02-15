@@ -104,7 +104,7 @@ fn add_liquidity_uneven_liq_test() {
         }
     }).to_string();
     transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, join_args);
-    
+
 
     let joiner_share_balance_a: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
 
@@ -223,7 +223,7 @@ fn join_zero_liq_test() {
 
     let seed_amount = to_token_denom(100);
     let join_amount0 = to_token_denom(500);
- 
+
     let half = U128(to_token_denom(5) / 10);
     let weights = Some(vec![half, half]);
 
@@ -257,3 +257,60 @@ fn join_zero_liq_test() {
     assert!(join_res.is_ok());
 }
 
+#[test]
+fn add_liquidity_redeem() {
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+
+    // Fund Bob
+    let transfer_amount = to_token_denom(100);
+    transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
+
+    // Create / validate market
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
+    assert_eq!(market_id, U64(0));
+
+    // Seed params
+    let seed_amount = to_token_denom(10);
+    let half = U128(to_token_denom(5) / 10);
+    let weights = vec![half, half];
+
+    // Add liquidity
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &bob, "amm".to_string(), seed_amount, add_liquidity_args);
+
+    // Exit pool
+    let bob_exit_res = call!(
+        bob,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(bob_exit_res.is_ok());
+
+    // Redeem liquidity
+    let redeem_call = call!(
+        bob,
+        amm.burn_outcome_tokens_redeem_collateral(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(redeem_call.is_ok());
+
+    // Assert pool token balance
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &bob.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(0));
+ 
+    // Assert collateral balance
+    let collateral_balance = get_balance(&token, bob.account_id());
+    assert_eq!(collateral_balance, transfer_amount);
+    
+    // Assert if shares are burned
+    let outcome_balance_0: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
+    let outcome_balance_1: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 1)).unwrap_json();
+    assert_eq!(outcome_balance_0, U128(0));
+    assert_eq!(outcome_balance_1, U128(0));
+}
