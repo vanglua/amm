@@ -53,7 +53,8 @@ pub trait CollateralToken {
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>,
-    token_whitelist: LookupMap<AccountId, u32> // Map a token's account id to number of decimals it's denominated in
+    token_whitelist: LookupMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in
+    paused: bool
 }
 
 #[near_bindgen]
@@ -83,7 +84,8 @@ impl Protocol {
         Self {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
-            token_whitelist
+            token_whitelist, 
+            paused: false
         }
     }
 
@@ -160,6 +162,7 @@ impl Protocol {
         collateral_token_id: AccountId,
         swap_fee: U128,
     ) -> U64 {
+        self.assert_unpaused();
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.markets.len();
@@ -200,6 +203,7 @@ impl Protocol {
         market_id: U64,
         total_in: U128,
     ) -> PromiseOrValue<bool> {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -235,6 +239,7 @@ impl Protocol {
         outcome_target: u16,
         max_shares_in: U128
     ) -> Promise {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let collateral_out: u128 = collateral_out.into();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -264,6 +269,7 @@ impl Protocol {
         &mut self,
         market_id: U64
     ) -> Promise {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(market.finalized, "ERR_NOT_FINALIZED");
@@ -301,6 +307,7 @@ impl Protocol {
         amount: U128,
         payload: String,
     ) -> Promise {
+        self.assert_unpaused();
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
 
@@ -356,11 +363,28 @@ impl Protocol {
         self.gov = new_gov.into();
     }
 
+    pub fn pause(
+        &mut self,
+        new_gov: ValidAccountId
+    ) {
+        self.assert_gov();
+        self.paused = true;
+    }
+
+    pub fn unpause(
+        &mut self,
+        new_gov: ValidAccountId
+    ) {
+        self.assert_gov();
+        self.paused = false;
+    }
+
     pub fn set_token_whitelist(
         &mut self,
         tokens: Vec<ValidAccountId>, 
         decimals: Vec<u32>
     ) {
+        self.assert_gov();
         assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
         let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
 
@@ -388,6 +412,7 @@ impl Protocol {
         market_id: U64,
         to_burn: U128
     ) -> Promise {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -419,6 +444,10 @@ impl Protocol {
 
     fn get_market_expect(&self, market_id: U64) -> Market {
         self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
+    }
+
+    fn assert_unpaused(&self) {
+        assert!(!self.paused, "ERR_PROTCOL_PAUSED")
     }
 
     fn add_liquidity(
