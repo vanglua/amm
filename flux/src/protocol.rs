@@ -365,7 +365,6 @@ impl Protocol {
         self.token_whitelist.push(to_add.into());
     }
 
-    // payable needed?
     #[payable]
     pub fn burn_outcome_tokens_redeem_collateral(
         &mut self,
@@ -375,7 +374,9 @@ impl Protocol {
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        market.pool.burn_tokens_for_redemption(
+        assert!(!market.finalized, "ERR_MARKET_FINALIZED");
+
+        market.pool.burn_outcome_tokens_redeem_collateral(
             &env::predecessor_account_id(),
             to_burn.into()
         );

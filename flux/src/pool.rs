@@ -197,7 +197,7 @@ impl Pool {
         fees
     }
 
-    pub fn burn_tokens_for_redemption (
+    pub fn burn_outcome_tokens_redeem_collateral (
         &mut self,
         sender: &AccountId,
         to_burn: u128
