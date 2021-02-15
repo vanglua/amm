@@ -1,13 +1,15 @@
 #![allow(clippy::needless_pass_by_value)]
 use std::convert::TryInto;
 use near_sdk::{
+    PendingContractTx,
     AccountId,
     json_types::{
         U64,
         U128,
         ValidAccountId
     },
-    serde_json::json
+    serde_json::json,
+    serde_json
 };
 
 use near_sdk_sim::{
@@ -30,6 +32,8 @@ use token::*;
 use flux::protocol::ProtocolContract;
 
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
+const TOKEN_CONTRACT_ID: &str = "token";
+const AMM_CONTRACT_ID: &str = "amm";
 
 // Load in contract bytes
 near_sdk_sim::lazy_static! {
@@ -40,7 +44,7 @@ near_sdk_sim::lazy_static! {
 pub fn init(
     initial_balance: u128,
     gov_id: AccountId,
-) -> (UserAccount, ContractAccount<ProtocolContract>, ContractAccount<ContractContract>, UserAccount, UserAccount, UserAccount) {
+) -> (UserAccount, ContractAccount<ProtocolContract>, AccountId, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
 
     // deploy amm
@@ -48,7 +52,7 @@ pub fn init(
         // Contract Proxy
         contract: ProtocolContract,
         // Contract account id
-        contract_id: "amm",
+        contract_id: AMM_CONTRACT_ID,
         // Bytes of contract
         bytes: &AMM_WASM_BYTES,
         // User deploying the contract,
@@ -66,7 +70,7 @@ pub fn init(
         // Contract Proxy
         contract: ContractContract,
         // Contract account id
-        contract_id: "token",
+        contract_id: TOKEN_CONTRACT_ID,
         // Bytes of contract
         bytes: &TOKEN_WASM_BYTES,
         // User deploying the contract,
@@ -76,22 +80,121 @@ pub fn init(
         init_method: new()
     );
 
-    // I need to access `storage_minimum_balance`
-    let storage_amount: U128 = view!(token_contract.storage_minimum_balance()).unwrap_json();
-    println!("sa {:?}", storage_amount);
-    let alice = master_account.create_user("alice".to_string(), to_yocto("100"));
-    let res = call!(
-        alice,
-        token_contract.storage_deposit(None),
-        deposit = storage_amount.into()
-    );
-    println!("r1 {:?}", res);
-    let bob = master_account.create_user("bob".to_string(), to_yocto("100"));
-    // token_contract.storage_deposit(Some("bob".to_string().try_into().unwrap()));
-    let carol = master_account.create_user("carol".to_string(), to_yocto("100"));
-    // token_contract.storage_deposit(Some("carol".to_string().try_into().unwrap()));
+    let storage_amount = get_storage_amount(&master_account);
+    storage_deposit(&master_account, storage_amount.into(), Some(AMM_CONTRACT_ID.to_string()));
+    
+    let alice = master_account.create_user("alice".to_string(), to_yocto("10000"));
+    storage_deposit(&alice, storage_amount.into(), None);
+    near_deposit(&alice, to_yocto("1000"));
+    let bob = master_account.create_user("bob".to_string(), to_yocto("10000"));
+    storage_deposit(&bob, storage_amount.into(), None);
+    near_deposit(&bob, to_yocto("1000"));
+    let carol = master_account.create_user("carol".to_string(), to_yocto("10000"));
+    storage_deposit(&carol, storage_amount.into(), None);
+    near_deposit(&carol, to_yocto("1000"));
 
-    (master_account, amm_contract, token_contract, alice, bob, carol)
+    (master_account, amm_contract, TOKEN_CONTRACT_ID.to_string(), alice, bob, carol)
+}
+
+pub fn get_storage_amount(sender: &UserAccount) -> U128 {
+    sender.view(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID, 
+            "storage_minimum_balance", 
+            json!({}), 
+            true
+        )
+    ).unwrap_json()
+}
+
+pub fn storage_deposit(sender: &UserAccount, deposit: u128, to_register: Option<AccountId>) {
+    let res = sender.call(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID,
+            "storage_deposit",
+            json!({
+                "account_id": to_register
+            }),
+            false
+        ),
+        deposit,
+        DEFAULT_GAS
+    );
+    assert!(res.is_ok(), "storage deposit failed with res: {:?}", res);
+}
+
+pub fn near_deposit(sender: &UserAccount, deposit: u128) {
+    let res = sender.call(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID,
+            "near_deposit",
+            json!({}),
+            false
+        ),
+        deposit,
+        DEFAULT_GAS
+    );
+    assert!(res.is_ok(), "wnear deposit failed with res: {:?}", res);
+}
+
+pub fn ft_balance_of(sender: &UserAccount, account_id: &AccountId) -> u128 {
+    sender.view(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID, 
+            "ft_balance_of", 
+            json!({
+                "account_id": account_id.to_string()
+            }), 
+            true
+        )
+    ).unwrap_json()
+}
+
+pub fn transfer_unsafe(
+    sender: &UserAccount,
+    receiver_id: &AccountId,
+    amount: u128,
+) {
+    let res = sender.call(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID, 
+            "ft_transfer", 
+            json!({
+                "receiver_id": receiver_id,
+                "amount": U128::from(amount),
+                "memo": "".to_string()
+            }), 
+            true
+        ),
+        1,
+        DEFAULT_GAS
+    );
+    println!("t res {:?}", res);
+
+    assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
+}
+pub fn ft_transfer_call(
+    sender: &UserAccount, 
+    amount: u128,
+    msg: String
+) {
+    let res = sender.call(
+        PendingContractTx::new(
+            TOKEN_CONTRACT_ID, 
+            "ft_transfer_call", 
+            json!({
+                "receiver_id": AMM_CONTRACT_ID.to_string(),
+                "amount": U128::from(amount),
+                "msg": msg,
+                "memo": "".to_string()
+            }), 
+            true
+        ),
+        1,
+        DEFAULT_GAS
+    );
+    println!("tc res {:?}", res);
+    assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
 }
 
 pub fn empty_string() -> String { "".to_string() }

@@ -27,7 +27,7 @@ use crate::helper::*;
 use crate::pool::Pool;
 use crate::logger;
 use crate::pool_factory;
-use crate::payload_structs;
+use crate::msg_structs;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
@@ -290,22 +290,22 @@ impl Protocol {
     pub fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
-        vault_id: u64,
         amount: U128,
-        payload: String,
+        msg: String,
     ) -> U128 {
         let amount: u128 = amount.into();
         let initial_storage = env::storage_usage();
-        let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
+        let parsed_msg: msg_structs::InitStruct = serde_json::from_str(msg.as_str()).expect("ERR_INCORRECT_JSON");
 
-        let amount_used = match parsed_payload.function.as_str() {
-            "add_liquidity" => self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args), 
-            "buy" => self.buy(&sender_id, vault_id, amount, parsed_payload.args),
+        let amount_used = match parsed_msg.function.as_str() {
+            "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
+        //     "buy" => self.buy(&sender_id, amount, parsed_msg.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
 
         self.refund_storage(initial_storage, sender_id);
-        amount_used.into()
+        // amount_used.into()
+        0.into()
     }
 
     /*** Gov setters ***/
@@ -375,11 +375,10 @@ impl Protocol {
     fn add_liquidity(
         &mut self, 
         sender: &AccountId,
-        vault_id: u64,
         total_in: u128,
         args: serde_json::Value,
     ) -> u128 {
-        let parsed_args: payload_structs::AddLiquidity = payload_structs::from_args(args);
+        let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
                 Some(weight_indication
@@ -410,11 +409,10 @@ impl Protocol {
     fn buy(
         &mut self, 
         sender: &AccountId,
-        vault_id: u64,
         collateral_in: u128, 
         args: serde_json::Value,
     ) -> u128 {
-        let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
+        let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
