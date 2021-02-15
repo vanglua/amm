@@ -18,7 +18,8 @@ use near_sdk::{
     AccountId,
     env,
     collections::{
-        Vector
+        Vector,
+        LookupMap
     },
 };
 
@@ -31,9 +32,6 @@ use crate::payload_structs;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
-const TOKEN_DENOM: u128 = 1_000_000_000_000_000_000; // 1e18
-const MAX_FEE: u128 = TOKEN_DENOM / 20; // max fee is 5%
-const MIN_FEE: u128 = TOKEN_DENOM / 10_000; // max fee is %0.01
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {
@@ -41,9 +39,6 @@ pub struct Market {
     pub pool: Pool,
     pub payout_numerator: Option<Vec<U128>>,
     pub finalized: bool,
-}
-
-impl Market {
 }
 
 #[ext_contract]
@@ -58,7 +53,7 @@ pub trait CollateralToken {
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>,
-    token_whitelist: Vec<AccountId>
+    token_whitelist: LookupMap<AccountId, u32> // Map a token's account id to number of decimals it's denominated in
 }
 
 #[near_bindgen]
@@ -70,13 +65,25 @@ impl Protocol {
      * @param token_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
-    pub fn init(gov: ValidAccountId, token_whitelist: Vec<ValidAccountId>) -> Self {
+    pub fn init(
+        gov: ValidAccountId, 
+        tokens: Vec<ValidAccountId>, 
+        decimals: Vec<u32>
+    ) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
-        
+        assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
+        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+
+        for (i, id) in tokens.into_iter().enumerate() {
+            let decimal = decimals[i];
+            let account_id: AccountId = id.into();
+            token_whitelist.insert(&account_id, &decimal);
+        };
+
         Self {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
-            token_whitelist: token_whitelist.into_iter().map(|t| t.into()).collect()
+            token_whitelist
         }
     }
 
@@ -156,17 +163,17 @@ impl Protocol {
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.markets.len();
-        assert!(self.token_whitelist.contains(&collateral_token_id), "ERR_INVALID_COLLATERAL");
+        let token_decimals = self.token_whitelist.get(&collateral_token_id);
+        assert!(token_decimals.is_some(), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
         assert!(end_time > ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
-        assert!(swap_fee == 0 || (swap_fee <= MAX_FEE && swap_fee >= MIN_FEE), "ERR_INVALID_FEE");
         let initial_storage = env::storage_usage();
 
         let pool = pool_factory::new_pool(
             market_id,
-            env::predecessor_account_id(),
             outcomes,
             collateral_token_id,
+            token_decimals.unwrap(),
             swap_fee
         );
 
@@ -327,7 +334,7 @@ impl Protocol {
         match &payout_numerator {
             Some(v) => {
                 let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
-                assert_eq!(sum, TOKEN_DENOM, "ERR_INVALID_PAYOUT_SUM");
+                assert_eq!(sum, market.pool.collateral_denomination, "ERR_INVALID_PAYOUT_SUM");
                 assert_eq!(v.len(), market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR");
             },
             None => ()
@@ -351,18 +358,28 @@ impl Protocol {
 
     pub fn set_token_whitelist(
         &mut self,
-        whitelist: Vec<ValidAccountId>
+        tokens: Vec<ValidAccountId>, 
+        decimals: Vec<u32>
     ) {
-        self.assert_gov();
-        self.token_whitelist = whitelist.into_iter().map(|t| t.into()).collect();
+        assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
+        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+
+        for (i, id) in tokens.into_iter().enumerate() {
+            let decimal = decimals[i];
+            let account_id: AccountId = id.into();
+            token_whitelist.insert(&account_id, &decimal);
+        };
+        self.token_whitelist = token_whitelist
     }
 
     pub fn add_to_token_whitelist(
         &mut self,
-        to_add: ValidAccountId
+        to_add: ValidAccountId,
+        decimals: u32
     ) {
         self.assert_gov();
-        self.token_whitelist.push(to_add.into());
+        let account_id = to_add.into();
+        self.token_whitelist.insert(&account_id, &decimals);
     }
 
     #[payable]

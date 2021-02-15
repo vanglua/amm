@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, view};
 
 #[test]
 fn pool_initial_pricing_test() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let seed_amount = to_token_denom(20);
     let half = to_token_denom(5) / 10;
 

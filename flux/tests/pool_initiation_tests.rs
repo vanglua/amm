@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, view};
 
 #[test]
 fn pool_initial_state_test() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("1"), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
 
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
 

@@ -6,10 +6,9 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn valid_market_lp_fee_test() {
-    let (master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("1"), "carol".to_string());
+    let (_master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("100000000"), "carol".to_string());
 
     let joiner_trader_balances = to_token_denom(10000);
-    let funder_balance = to_yocto("100") - joiner_trader_balances * 2;
     transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
     transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
 
@@ -103,7 +102,7 @@ fn valid_market_lp_fee_test() {
 // TODO: split up tests
 #[test]
 fn invalid_market_lp_fee_test() {
-    let (master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, funder, joiner, trader) = test_utils::init(to_yocto("100000"), "carol".to_string());
 
     let joiner_trader_balances = to_token_denom(10000);
 

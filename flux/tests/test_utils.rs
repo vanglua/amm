@@ -26,7 +26,6 @@ extern crate flux;
 pub use flux::*;
 use flux::protocol::ProtocolContract;
 
-
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 
 struct InitRes {
@@ -62,7 +61,8 @@ pub fn init(
         // init method
         init_method: init(
             gov_id.try_into().unwrap(),
-            vec!["token".try_into().unwrap()]
+            vec!["token".try_into().unwrap()],
+            vec![24]
         )
     );
 
@@ -88,6 +88,9 @@ pub fn init(
     (master_account, amm_contract, token_contract, alice, bob, carol)
 }
 
+pub fn token_denom() -> u128 {
+    to_yocto("1")
+}
 
 pub fn init_token(
     token_contract: &UserAccount,
@@ -170,7 +173,7 @@ pub fn env_time() -> U64{
     1609951265967.into()
 }
 pub fn fee() -> U128 {
-    (10_u128.pow(18) / 50).into() // 2%
+    (10_u128.pow(24) / 50).into() // 2%
 }
 
 pub fn create_market(creator: &UserAccount, amm: &ContractAccount<ProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
@@ -182,7 +185,7 @@ pub fn create_market(creator: &UserAccount, amm: &ContractAccount<ProtocolContra
 }
 
 pub fn to_token_denom(amt: u128) -> u128 {
-    amt * 10_u128.pow(18)
+    amt * 10_u128.pow(24)
 }
 
 pub fn swap_fee() -> U128 {
@@ -191,12 +194,10 @@ pub fn swap_fee() -> U128 {
 
 pub fn product_of(nums: &Vec<U128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
-    let mut product = constants::TOKEN_DENOM;
-
+    let mut product = 0;
     for price in nums.to_vec() {
-        product = math::mul_u128(product, u128::from(price));
+        product = math::mul_u128(token_denom(),token_denom(), u128::from(price));
     }
-    
     product
 }
 
@@ -204,7 +205,7 @@ pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
     let product = product_of(&prices);
     
     prices.iter().map(|price| {
-       U128(math::div_u128(u128::from(product), u128::from(*price)))
+       U128(math::div_u128(token_denom(), u128::from(product), u128::from(*price)))
     }).collect()
 }
 

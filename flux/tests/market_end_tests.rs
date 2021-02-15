@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn test_valid_market_resolution() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
 
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
@@ -44,7 +44,7 @@ fn test_valid_market_resolution() {
 
 #[test]
 fn test_valid_market_payout() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), to_token_denom(10000));
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
@@ -123,7 +123,7 @@ fn test_valid_market_payout() {
 #[test]
 fn test_invalid_market_payout() {
         // Get accounts
-        let (_master_account, amm, token, lp, trader, gov) = init(to_yocto("1"), "carol".to_string());
+        let (_master_account, amm, token, lp, trader, gov) = init(to_yocto("100000"), "carol".to_string());
         
         // Fund accounts
         transfer_unsafe(&token, &lp, trader.account_id(), to_token_denom(10000));

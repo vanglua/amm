@@ -7,7 +7,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 #[test]
 fn test_invalid_market_payout() {
         // Init and get accounts
-        let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "carol".to_string());
+        let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
         
         // Fund accounts  lp trader1 trader 1
         transfer_unsafe(&token, &lp, trader1.account_id(), to_token_denom(10000));

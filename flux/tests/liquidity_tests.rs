@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn add_liquidity_even_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
 
@@ -52,8 +52,8 @@ fn add_liquidity_even_liq_test() {
 
 #[test]
 fn add_liquidity_uneven_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
 
@@ -116,7 +116,7 @@ fn add_liquidity_uneven_liq_test() {
 
 #[test]
 fn multiple_pool_exits_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
@@ -215,7 +215,7 @@ fn multiple_pool_exits_test() {
 
 #[test]
 fn join_zero_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     let transfer_amount = to_token_denom(100);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), transfer_amount);
@@ -259,7 +259,7 @@ fn join_zero_liq_test() {
 
 #[test]
 fn add_liquidity_redeem() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
 
     // Fund Bob
     let transfer_amount = to_token_denom(100);
