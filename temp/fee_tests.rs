@@ -10,8 +10,6 @@ fn valid_market_lp_fee_test() {
 
     let joiner_trader_balances = to_token_denom(10000);
     let funder_balance = to_yocto("100") - joiner_trader_balances * 2;
-    transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
-    transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
 
     let seed_amount = to_token_denom(1000);
     let buy_amt = to_token_denom(100);
@@ -31,7 +29,7 @@ fn valid_market_lp_fee_test() {
             "weight_indication": Some(weights)
         }
     }).to_string();
-    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&funder, seed_amount, add_liquidity_args);
 
     let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &funder.account_id())).unwrap_json();
 
@@ -53,16 +51,16 @@ fn valid_market_lp_fee_test() {
         }
     }).to_string();
     
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
 
     // joiner
     let add_liquidity_args = json!({
@@ -71,7 +69,7 @@ fn valid_market_lp_fee_test() {
             "market_id": market_id
         }
     }).to_string();
-    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&joiner, seed_amount, add_liquidity_args);
 
     let joiner_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &joiner.account_id())).unwrap_json();
 
@@ -107,9 +105,7 @@ fn invalid_market_lp_fee_test() {
 
     let joiner_trader_balances = to_token_denom(10000);
 
-    transfer_unsafe(&token, &funder, joiner.account_id().to_string(), to_token_denom(10000));
-    transfer_unsafe(&token, &funder, trader.account_id().to_string(), to_token_denom(10000));
-    let funder_balance = get_balance(&token, funder.account_id());
+    let funder_balance = ft_balance_of(&funder, &funder.account_id());
     let seed_amount = to_token_denom(1000);
     let buy_amt = to_token_denom(100);
     let target_price_a = U128(to_token_denom(5) / 10);
@@ -129,7 +125,7 @@ fn invalid_market_lp_fee_test() {
         }
     }).to_string();
 
-    transfer_with_vault(&token, &funder, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&funder, seed_amount, add_liquidity_args);
 
     let funder_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &funder.account_id())).unwrap_json();
 
@@ -151,16 +147,16 @@ fn invalid_market_lp_fee_test() {
         }
     }).to_string();
     
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
     
     // Sell back for buy amount
     let sell_res = call!(
@@ -183,7 +179,7 @@ fn invalid_market_lp_fee_test() {
             "market_id": market_id
         }
     }).to_string();
-    transfer_with_vault(&token, &joiner, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&joiner, seed_amount, add_liquidity_args);
 
     let joiner_pool_balance: U128 = view!(amm.get_pool_token_balance(market_id, &joiner.account_id())).unwrap_json();
 
@@ -245,10 +241,10 @@ fn invalid_market_lp_fee_test() {
     assert!(trader_claim_res.is_ok());
 
     // Get updated balances
-    let lp_final_balance = get_balance(&token, funder.account_id());
-    let joiner_final_balance = get_balance(&token, joiner.account_id());
-    let trader_final_balance = get_balance(&token, trader.account_id());
-    let amm_final_balance = get_balance(&token, "amm".to_string());
+    let lp_final_balance = ft_balance_of(&funder, &funder.account_id());
+    let joiner_final_balance = ft_balance_of(&funder, &joiner.account_id());
+    let trader_final_balance = ft_balance_of(&funder, &trader.account_id());
+    let amm_final_balance = ft_balance_of(&funder, &"amm".to_string());
     
     // Assert balances
     let expected_lp_final_balance = funder_balance + u128::from(claimable_by_funder);
