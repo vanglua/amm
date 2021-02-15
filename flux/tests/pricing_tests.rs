@@ -52,7 +52,7 @@ fn pool_initial_pricing_test() {
 }
 
 #[test]
-fn multi_outcome_pool_pricing_test() {
+fn pricing_multi_outcome_pool_test() {
     // Even pool
     let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let seed_amount = to_token_denom(100);
@@ -75,7 +75,7 @@ fn multi_outcome_pool_pricing_test() {
         amm.get_spot_price_sans_fee(market_id, 1)
     ).unwrap_json();
 
-    assert_eq!(even_price, U128(333_333_333_333_333_334));
+    assert_eq!(even_price, U128(333333333333333333333334));
 
     let alice_exit_res = call!(
         alice,
@@ -134,7 +134,7 @@ fn multi_outcome_pool_pricing_test() {
 }
 
 #[test]
-fn fee_test_calc() {
+fn pricing_fee_test_calc() {
     let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
 
     let half = to_token_denom(1) / 2;

@@ -27,7 +27,7 @@ fn pool_initial_state_test() {
     transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("1") - seed_amount);
+    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount);
     let amm_collateral_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_collateral_balance, seed_amount);
 

@@ -105,7 +105,7 @@ fn test_valid_market_payout() {
     assert!(res.is_ok(), "ERR_TX_FAILED");
     
     let claimer_balance = get_balance(&token, bob.account_id());
-    let expected_claimer_balance = 10_000_019_603_038_518_995_487_u128;
+    let expected_claimer_balance = 10000019603038518995487419933_u128;
     assert_eq!(claimer_balance, expected_claimer_balance, "unexpected payout");
     
     let res = call!(

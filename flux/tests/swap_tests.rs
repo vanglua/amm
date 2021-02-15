@@ -82,7 +82,7 @@ fn basic_buy_test() {
     let buy_res = transfer_with_vault(&token, &alice, "amm".to_string(), buy_amount, buy_args);
 
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("1") - seed_amount - buy_amount);
+    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount - buy_amount);
     let amm_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_balance, seed_amount + buy_amount);
 
@@ -138,7 +138,7 @@ fn basic_sell_test() {
 
 
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("1") - seed_amount - buy_amount);
+    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount - buy_amount);
     let amm_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_balance, seed_amount + buy_amount);
 
@@ -167,7 +167,7 @@ fn basic_sell_test() {
     assert_eq!(pool_balances[1], U128(seed_amount));
 
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("1") - seed_amount);
+    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount);
     let amm_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_balance, seed_amount);
 }

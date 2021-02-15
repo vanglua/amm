@@ -363,18 +363,12 @@ impl Protocol {
         self.gov = new_gov.into();
     }
 
-    pub fn pause(
-        &mut self,
-        new_gov: ValidAccountId
-    ) {
+    pub fn pause(&mut self) {
         self.assert_gov();
         self.paused = true;
     }
 
-    pub fn unpause(
-        &mut self,
-        new_gov: ValidAccountId
-    ) {
+    pub fn unpause(&mut self) {
         self.assert_gov();
         self.paused = false;
     }

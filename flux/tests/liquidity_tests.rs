@@ -29,7 +29,7 @@ fn add_liquidity_even_liq_test() {
     let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
     assert_eq!(pool_token_balance, U128(seed_amount));
     let seeder_balance = get_balance(&token, alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("1") - seed_amount - transfer_amount);
+    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount - transfer_amount);
     let amm_collateral_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_collateral_balance, seed_amount);
 

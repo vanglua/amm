@@ -24,6 +24,7 @@ pub fn log_pool(pool: &Pool) {
                 "outcomes": pool.outcomes,
                 "swap_fee": U128(pool.swap_fee),
                 "collateral_token_id": pool.collateral_token_id,
+                "collateral_denomination": pool.collateral_denomination,
                 "total_withdrawn_fees": U128(pool.total_withdrawn_fees),
                 "fee_pool_weight": U128(pool.fee_pool_weight),
                 "block_height": U64(env::block_index()),
