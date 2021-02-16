@@ -384,23 +384,6 @@ impl Pool {
         withdrawable_amount
     }
 
-    // pub fn publish(
-    //     &mut self,
-    //     sender: &AccountId,
-    //     amount_in: u128
-    // ) -> u128 {
-
-    //     assert_eq!(sender, &self.owner, "ERR_NO_OWNER");
-    //     assert_eq!(self.outcome_tokens.len() as u16, self.outcomes, "ERR_NOT_BINDED");
-    //     assert!(amount_in >= self.pool_token.total_supply(), "ERR_INSUFFICIENT_COLLATERAL");
-
-
-
-    //     logger::log_pool(&self);
-
-    //     self.pool_token.total_supply()
-    // }
-
     pub fn calc_buy_amount(
         &self,
         collateral_in: u128,
