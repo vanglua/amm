@@ -164,7 +164,6 @@ impl Protocol {
 
         let pool = pool_factory::new_pool(
             market_id,
-            env::predecessor_account_id(),
             outcomes,
             collateral_token_id,
             swap_fee
@@ -256,22 +255,22 @@ impl Protocol {
     pub fn claim_earnings(
         &mut self,
         market_id: U64
-    ) -> Promise {
+    ){
+    // ) -> Promise {
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(market.finalized, "ERR_NOT_FINALIZED");
 
         let payout = market.pool.payout(&env::predecessor_account_id(), &market.payout_numerator);
-        
         self.markets.replace(market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        logger::log_claim_earnings(
-            market_id,
-            env::predecessor_account_id(),
-            payout
-        );
+        // logger::log_claim_earnings(
+        //     market_id,
+        //     env::predecessor_account_id(),
+        //     payout
+        // );
         if payout > 0 {
                 collateral_token::transfer(
                     env::predecessor_account_id(),
@@ -279,7 +278,7 @@ impl Protocol {
                     &market.pool.collateral_token_id,
                     0,
                     GAS_BASE_COMPUTE
-                )
+                );
         } else {
             panic!("ERR_NO_PAYOUT");
         }

@@ -474,7 +474,7 @@ fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_
             "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args); 
 
     //  buy outcome target 0 tokens
     let buy_args = json!({
@@ -503,6 +503,8 @@ fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_
         deposit = STORAGE_AMOUNT
     );
     assert!(liq_exit.is_ok());
+
+    let funder_pool_token_balance_after_exit_0: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
 
     // add liquidity with unequal weights reversed
     let weights = calc_weights_from_price(vec![target_price_b, target_price_a]);
