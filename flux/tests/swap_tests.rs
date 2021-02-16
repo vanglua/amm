@@ -455,7 +455,7 @@ fn selling_uneven_lp_shares_categorical_test() {
 }
 
 fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_80_20: u128) {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, gov) = init(to_yocto("1"), "carol".to_string());
 
     let bob_amount = to_token_denom(10000);
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), bob_amount);
@@ -550,8 +550,40 @@ fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_
     let collateral_balance = get_balance(&token, bob.account_id());
     assert_eq!(collateral_balance, expected_collateral_balance);
 
-    // todo
-    // check pool states?
+    // remove liquidity again
+    let liq_exit = call!(
+        alice,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(liq_exit.is_ok());
+
+    // Resolute market
+    let resolution_res = call!(
+        gov,
+        amm.resolute_market(market_id, None),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(resolution_res.is_ok());
+
+    // Claim earnings
+    let alice_claim_res = call!(
+        alice,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    if !alice_claim_res.is_ok() {
+        panic!("alice claim earnings failed: {:?}", alice_claim_res);
+    }
+
+    let bob_claim_res = call!(
+        bob,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    if !bob_claim_res.is_ok() {
+        panic!("alice claim earnings failed: {:?}", bob_claim_res);
+    }
 }
 
 #[test]
@@ -561,6 +593,16 @@ fn redeem_collat_with_bought_tokens_for_higher_price() {
     let target_price_b = U128(to_token_denom(20) / 100);
     // bob bought 2 times, and redeemed 1.22 again (loss of 0.8 tokens)
     redeem_collat_helper(target_price_a, target_price_b, token_value_80_20);
+
+    //   // Get updated balances
+    //   let lp_final_balance = get_balance(&token, lp.account_id());
+    //   let trader_final_balance = get_balance(&token, trader.account_id());
+    //   let amm_final_balance = get_balance(&token, "amm".to_string());
+
+    //   // Assert balances
+    //   assert_eq!(lp_final_balance, expected_lp_final_balance);
+    //   assert_eq!(trader_final_balance, expected_trader_final_balance);
+    //   assert_eq!(amm_final_balance, expected_amm_final_balance);
 }
 
 #[test]
