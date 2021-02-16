@@ -59,7 +59,7 @@ fn basic_buy_test() {
 
     let market_id: U64 = create_market(&alice, &amm, 2, Some(U128(0)));
     assert_eq!(market_id, U64(0));
-    
+
     let weights = Some(vec![U128(weight), U128(weight)]);
     let add_liquidity_args = json!({
         "function": "add_liquidity",
@@ -88,7 +88,7 @@ fn basic_buy_test() {
 
     let pool_balances: Vec<U128> = view!(amm.get_pool_balances(market_id)).unwrap_json();
 
-    let expected_target_pool_balance = invariant / 11; 
+    let expected_target_pool_balance = invariant / 11;
     let expected_other_outcome_pool_balance = seed_amount + buy_amount;
     assert_eq!(pool_balances[0], U128(expected_target_pool_balance));
     assert_eq!(pool_balances[1], U128(expected_other_outcome_pool_balance));
@@ -142,7 +142,7 @@ fn basic_sell_test() {
     let amm_balance = get_balance(&token, "amm".to_string());
     assert_eq!(amm_balance, seed_amount + buy_amount);
 
-    let expected_target_pool_balance = invariant / 11; 
+    let expected_target_pool_balance = invariant / 11;
 
     let expected_target_buyer_balance = seed_amount + buy_amount - expected_target_pool_balance;
     let expected_other_buyer_balance = 0;
@@ -172,7 +172,7 @@ fn basic_sell_test() {
     assert_eq!(amm_balance, seed_amount);
 }
 
-// Check price after uneven swaps 
+// Check price after uneven swaps
 #[test]
 fn complex_buy_test() {
     let (master_account, amm, token, alice, bob, carol) = init(to_yocto("1"), "carol".to_string());
@@ -187,8 +187,8 @@ fn complex_buy_test() {
 
     let weights = calc_weights_from_price(
         vec![
-            U128(to_token_denom(60)), 
-            U128(to_token_denom(30)), 
+            U128(to_token_denom(60)),
+            U128(to_token_denom(30)),
             U128(to_token_denom(10))
         ]
     );
@@ -217,7 +217,7 @@ fn complex_buy_test() {
         }
     }).to_string();
     transfer_with_vault(&token, &bob, "amm".to_string(), buy_amount, buy_args);
-    
+
     let post_trade_balances: Vec<U128> = view!(amm.get_pool_balances(market_id)).unwrap_json();
     let post_trade_invariant = product_of(&post_trade_balances);
     assert!(init_invariant - post_trade_invariant <  1000);
@@ -238,7 +238,7 @@ fn complex_buy_test() {
 fn multi_sell_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "carol".to_string());
-    
+
 
     let precision = to_token_denom(1) / 100; // 1 token_cent precision
 
@@ -248,13 +248,13 @@ fn multi_sell_test() {
 
     // Get initial balances
     let trader1_init_balance = get_balance(&token, trader1.account_id());
-    
+
     // Expect trader1 to have ....
     let expected_trader1_share_bal = 1_909_090_909_090_909_091;
     // Expect trader2 to have ....
     let expected_trader2_share_bal = 1_757_575_757_575_757_576;
     let expected_trader2_final_balance = to_token_denom(991) / 100;
-    
+
     // Seed / trade parameters
     let target_price = U128(to_token_denom(5) / 10);
     let seed_amount = to_token_denom(10);
@@ -263,7 +263,7 @@ fn multi_sell_test() {
 
     // Create market
     let market_id = create_market(&lp, &amm, 2, Some(U128(0)));
-    
+
     // Seed market
     let add_liquidity_args = json!({
         "function": "add_liquidity",
@@ -287,22 +287,22 @@ fn multi_sell_test() {
             "min_shares_out": U128(to_token_denom(8) / 10)
         }
     }).to_string();
-    
+
     transfer_with_vault(&token, &trader1, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &trader2, "amm".to_string(), buy_amt, buy_a_args.to_string()); 
+    transfer_with_vault(&token, &trader2, "amm".to_string(), buy_amt, buy_a_args.to_string());
 
     let trader1_share_balance: U128 = view!(amm.get_share_balance(&trader1.account_id(), market_id, 0)).unwrap_json();
     let trader2_share_balance: U128 = view!(amm.get_share_balance(&trader2.account_id(), market_id, 0)).unwrap_json();
     assert_eq!(trader1_share_balance, U128(expected_trader1_share_bal));
     assert_eq!(trader2_share_balance, U128(expected_trader2_share_bal));
 
-    // Sell back from trader 1 and trader 2 
+    // Sell back from trader 1 and trader 2
     let sell_res_trader1 = call!(
         trader1,
         amm.sell(market_id, U128(buy_amt + buy_amt / 13), 0, U128(buy_amt * 25 / 10)),
         deposit = STORAGE_AMOUNT
     );
-    
+
     let sell_res_trader2 = call!(
         trader2,
         amm.sell(market_id, U128(to_token_denom(9115) / 10000), 0, U128(buy_amt * 25 / 10)),
@@ -331,9 +331,9 @@ fn complex_sell_with_fee_test() {
 
     // Get initial balances
     let trader1_init_balance = get_balance(&token, trader1.account_id());
-    
+
     let expected_trader1_share_bal = 1_872_531_876_138_433_515;
-    
+
     // Seed / trade parameters
     let target_price = U128(to_token_denom(5) / 10);
     let seed_amount = to_token_denom(10);
@@ -342,7 +342,7 @@ fn complex_sell_with_fee_test() {
 
     // Create market
     let market_id = create_market(&lp, &amm, 2, Some(swap_fee()));
-    
+
     // Seed market
     let add_liquidity_args = json!({
         "function": "add_liquidity",
@@ -365,14 +365,14 @@ fn complex_sell_with_fee_test() {
             "min_shares_out": U128(to_token_denom(8) / 10)
         }
     }).to_string();
-    
+
     transfer_with_vault(&token, &trader1, "amm".to_string(), buy_amt, buy_a_args.to_string());
 
     let trader1_share_balance: U128 = view!(amm.get_share_balance(&trader1.account_id(), market_id, 0)).unwrap_json();
     assert_eq!(trader1_share_balance, U128(expected_trader1_share_bal));
 
 
-    // Sell back from trader 1 and trader 2 
+    // Sell back from trader 1 and trader 2
     let sell_res_trader1 = call!(
         trader1,
         amm.sell(market_id, U128(959159302164807332), 0, U128(buy_amt * 25 / 10)),
@@ -394,7 +394,7 @@ fn selling_uneven_lp_shares_binary_test() {
 
     // Create market
     let market_id = create_market(&lp, &amm, 2, Some(swap_fee()));
-    
+
     // Seed market
     let add_liquidity_args = json!({
         "function": "add_liquidity",
@@ -413,7 +413,7 @@ fn selling_uneven_lp_shares_binary_test() {
         amm.sell(market_id, U128(amount_out_expected), 0, U128(balance_after_seed)),
         deposit = STORAGE_AMOUNT
     );
-    
+
 
     assert!(sell_res_lp.is_ok());
 
@@ -432,7 +432,7 @@ fn selling_uneven_lp_shares_categorical_test() {
 
     // Create market
     let market_id = create_market(&lp, &amm, 4, Some(swap_fee()));
-    
+
     let add_liquidity_args = json!({
         "function": "add_liquidity",
         "args": {
@@ -452,4 +452,165 @@ fn selling_uneven_lp_shares_categorical_test() {
     );
 
     assert!(sell_res_lp.is_ok());
+}
+
+fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_80_20: u128) {
+    let (master_account, amm, token, alice, bob, gov) = init(to_yocto("1"), "carol".to_string());
+
+    let bob_amount = to_token_denom(10000);
+    transfer_unsafe(&token, &alice, bob.account_id().to_string(), bob_amount);
+    let seed_amount = to_token_denom(10);
+    let buy_amount = to_token_denom(1);
+
+    let market_id: U64 = create_market(&alice, &amm, 2, Some(U128(0)));
+    assert_eq!(market_id, U64(0));
+    let weights = calc_weights_from_price(vec![target_price_a, target_price_b]);
+
+    // add initial iquidity with unequal weights
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+
+    //  buy outcome target 0 tokens
+    let buy_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(0)
+        }
+    }).to_string();
+
+    let buy_res = transfer_with_vault(&token, &bob, "amm".to_string(), buy_amount, buy_args);
+    let expected_target_buyer_balance = token_value_80_20;
+    let expected_other_buyer_balance = 0;
+
+    let target_buyer_balance: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
+    let other_buyer_balance: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 1)).unwrap_json();
+
+    assert_eq!(expected_target_buyer_balance, u128::from(target_buyer_balance));
+    assert_eq!(expected_other_buyer_balance, u128::from(other_buyer_balance));
+
+    // remove initial liquidity
+    let liq_exit = call!(
+        alice,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(liq_exit.is_ok());
+
+    // add liquidity with unequal weights reversed
+    let weights = calc_weights_from_price(vec![target_price_b, target_price_a]);
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+
+    // buy outcome target 1 tokens
+    let buy_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 1,
+            "min_shares_out": U128(0)
+        }
+    }).to_string();
+
+    let buy_res = transfer_with_vault(&token, &bob, "amm".to_string(), buy_amount, buy_args);
+    let expected_target_buyer_balance = token_value_80_20;
+    let expected_other_buyer_balance = token_value_80_20;
+
+    let target_buyer_balance: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
+    let other_buyer_balance: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 1)).unwrap_json();
+
+    assert_eq!(expected_target_buyer_balance, u128::from(target_buyer_balance));
+    assert_eq!(expected_other_buyer_balance, u128::from(other_buyer_balance));
+
+    // Redeem liquidity
+    let redeem_call = call!(
+        bob,
+        amm.burn_outcome_tokens_redeem_collateral(market_id, U128(token_value_80_20)),
+        deposit = STORAGE_AMOUNT
+    );
+    if !redeem_call.is_ok() {
+        panic!("redeem failed: {:?}", redeem_call);
+    }
+
+    // Assert collateral balance
+    let expected_collateral_balance = bob_amount - (buy_amount * 2) + token_value_80_20;
+    let collateral_balance = get_balance(&token, bob.account_id());
+    assert_eq!(collateral_balance, expected_collateral_balance);
+
+    // remove liquidity again
+    let liq_exit = call!(
+        alice,
+        amm.exit_pool(market_id, U128(seed_amount)),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(liq_exit.is_ok());
+
+    // Resolute market
+    let resolution_res = call!(
+        gov,
+        amm.resolute_market(market_id, None),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(resolution_res.is_ok());
+
+    // Claim earnings
+    let alice_claim_res = call!(
+        alice,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    if !alice_claim_res.is_ok() {
+        panic!("alice claim earnings failed: {:?}", alice_claim_res);
+    }
+
+    let bob_claim_res = call!(
+        bob,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    if !bob_claim_res.is_ok() {
+        panic!("alice claim earnings failed: {:?}", bob_claim_res);
+    }
+}
+
+#[test]
+fn redeem_collat_with_bought_tokens_for_higher_price() {
+    let token_value_80_20 = 1227272727272727273;
+    let target_price_a = U128(to_token_denom(80) / 100);
+    let target_price_b = U128(to_token_denom(20) / 100);
+    // bob bought 2 times, and redeemed 1.22 again (loss of 0.8 tokens)
+    redeem_collat_helper(target_price_a, target_price_b, token_value_80_20);
+
+    //   // Get updated balances
+    //   let lp_final_balance = get_balance(&token, lp.account_id());
+    //   let trader_final_balance = get_balance(&token, trader.account_id());
+    //   let amm_final_balance = get_balance(&token, "amm".to_string());
+
+    //   // Assert balances
+    //   assert_eq!(lp_final_balance, expected_lp_final_balance);
+    //   assert_eq!(trader_final_balance, expected_trader_final_balance);
+    //   assert_eq!(amm_final_balance, expected_amm_final_balance);
+}
+
+#[test]
+fn redeem_collat_with_bought_tokens_for_lower_price() {
+    let token_value_80_20 = 3857142857142857143;
+    let target_price_a = U128(to_token_denom(20) / 100);
+    let target_price_b = U128(to_token_denom(80) / 100);
+
+    // bob bought 2 times, and redeemed 3.85 again (gain of 1.85 tokens)
+    redeem_collat_helper(target_price_a, target_price_b, token_value_80_20);
 }
