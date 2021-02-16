@@ -124,9 +124,9 @@ fn pricing_multi_outcome_pool_test() {
 
     assert!(to_token_denom(1) - (price_0 + price_1 + price_2) < 100_000);
 
-    assert_eq!(price_0, 428_571_428_571_428_571);
-    assert_eq!(price_1, 428_571_428_571_428_571);
-    assert_eq!(price_2, 142_857_142_857_142_857);
+    assert_eq!(price_0, 428571428571428571428571);
+    assert_eq!(price_1, 428571428571428571428571);
+    assert_eq!(price_2, 142857142857142857142857);
 
     assert_eq!(price_0, expected_mp_0);
     assert_eq!(price_1, expected_mp_1);

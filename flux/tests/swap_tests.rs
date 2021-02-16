@@ -5,8 +5,8 @@ use near_sdk::serde_json::json;
 use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
-fn calc_buy_amount_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+fn swap_calc_buy_amount_test() {
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let seed_amount = to_token_denom(10);
     let half = to_token_denom(5) / 10;
     let weights = Some(vec![U128(half), U128(half)]);
@@ -23,12 +23,12 @@ fn calc_buy_amount_test() {
     transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let buy_amt: U128 = view!(amm.calc_buy_amount(market_id, U128(to_token_denom(1)), 0)).unwrap_json();
-    assert_eq!(u128::from(buy_amt), 1_909_090_909_090_909_091);
+    assert_eq!(u128::from(buy_amt), 1909090909090909090909091);
 }
 
 #[test]
-fn calc_sell_collateral_out_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+fn swap_calc_sell_collateral_out_test() {
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let seed_amount = to_token_denom(10);
     let half = to_token_denom(5) / 10;
     let weights = Some(vec![U128(half), U128(half)]);
@@ -46,12 +46,12 @@ fn calc_sell_collateral_out_test() {
     transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
 
     let collat_out: U128 = view!(amm.calc_sell_collateral_out(market_id, U128(to_token_denom(1)), 0)).unwrap_json();
-    assert_eq!(u128::from(collat_out), 2_111_111_111_111_111_111);
+    assert_eq!(u128::from(collat_out), 2111111111111111111111111);
 }
 
 #[test]
-fn basic_buy_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+fn swap_basic_buy_test() {
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let weight = to_token_denom(1) / 2;
     let seed_amount = to_token_denom(10);
     let buy_amount = to_token_denom(1);
@@ -104,8 +104,8 @@ fn basic_buy_test() {
 }
 
 #[test]
-fn basic_sell_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+fn swap_basic_sell_test() {
+    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     let weight = to_token_denom(1) / 2;
     let seed_amount = to_token_denom(10);
     let buy_amount = to_token_denom(1);
@@ -174,13 +174,12 @@ fn basic_sell_test() {
 
 // Check price after uneven swaps 
 #[test]
-fn complex_buy_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+fn swap_complex_buy_test() {
+    let (_master_account, amm, token, alice, bob, _carol) = init(to_yocto("100000"), "carol".to_string());
     transfer_unsafe(&token, &alice, bob.account_id().to_string(), to_token_denom(100));
 
     let seed_amount = to_token_denom(10);
     let buy_amount = to_token_denom(1);
-    let invariant = to_token_denom(10);
 
     let market_id: U64 = create_market(&alice, &amm, 3, Some(U128(0)));
 
@@ -206,8 +205,12 @@ fn complex_buy_test() {
 
 
     let init_balances: Vec<U128> = view!(amm.get_pool_balances(market_id)).unwrap_json();
+    println!("pre trade balances {:?}", init_balances);
+
     let init_invariant = product_of(&init_balances);
 
+    println!("init in {}", init_invariant);
+    
     let buy_args = json!({
         "function": "buy",
         "args": {
@@ -219,7 +222,9 @@ fn complex_buy_test() {
     transfer_with_vault(&token, &bob, "amm".to_string(), buy_amount, buy_args);
     
     let post_trade_balances: Vec<U128> = view!(amm.get_pool_balances(market_id)).unwrap_json();
+    println!("post trade balances {:?}", post_trade_balances);
     let post_trade_invariant = product_of(&post_trade_balances);
+    println!("post in {}", post_trade_invariant);
     assert!(init_invariant - post_trade_invariant <  1000);
 
     let target_pool_balance: U128 = view!(amm.get_share_balance(&"amm".to_string(), market_id, 0)).unwrap_json();
@@ -235,7 +240,7 @@ fn complex_buy_test() {
 }
 
 #[test]
-fn multi_sell_test() {
+fn swap_multi_sell_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
     
@@ -250,9 +255,9 @@ fn multi_sell_test() {
     let trader1_init_balance = get_balance(&token, trader1.account_id());
     
     // Expect trader1 to have ....
-    let expected_trader1_share_bal = 1_909_090_909_090_909_091;
+    let expected_trader1_share_bal = 1909090909090909090909091;
     // Expect trader2 to have ....
-    let expected_trader2_share_bal = 1_757_575_757_575_757_576;
+    let expected_trader2_share_bal = 1757575757575757575757576;
     let expected_trader2_final_balance = to_token_denom(991) / 100;
     
     // Seed / trade parameters
@@ -319,7 +324,7 @@ fn multi_sell_test() {
 
 
 #[test]
-fn complex_sell_with_fee_test() {
+fn swap_complex_sell_with_fee_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
 
@@ -332,7 +337,7 @@ fn complex_sell_with_fee_test() {
     // Get initial balances
     let trader1_init_balance = get_balance(&token, trader1.account_id());
     
-    let expected_trader1_share_bal = 1_872_531_876_138_433_515;
+    let expected_trader1_share_bal = 1872531876138433515482696;
     
     // Seed / trade parameters
     let target_price = U128(to_token_denom(5) / 10);
@@ -382,14 +387,14 @@ fn complex_sell_with_fee_test() {
 
 
 #[test]
-fn selling_uneven_lp_shares_binary_test() {
+fn swap_selling_uneven_lp_shares_binary_test() {
     // Get accounts
-    let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
+    let (_master_account, amm, token, lp, _trader1, _trader2) = init(to_yocto("100000"), "carol".to_string());
 
     // Seed / trade parameters
     let seed_amount = to_token_denom(10);
     let amount_out_expected = to_token_denom(932) / 1000;
-    let balance_after_seed = 3_333_333_333_333_333_333_u128;
+    let balance_after_seed = 3_333_333_333_333_333_333_333_333_333u128;
     let weights = calc_weights_from_price(vec![U128(to_token_denom(55) / 100), U128(to_token_denom(45) / 100)]);
 
     // Create market
@@ -414,13 +419,12 @@ fn selling_uneven_lp_shares_binary_test() {
         deposit = STORAGE_AMOUNT
     );
     
-
     assert!(sell_res_lp.is_ok());
 
 }
 
 #[test]
-fn selling_uneven_lp_shares_categorical_test() {
+fn swap_selling_uneven_lp_shares_categorical_test() {
     // Get accounts
     let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
 
