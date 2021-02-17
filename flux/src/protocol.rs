@@ -28,7 +28,7 @@ use crate::helper::*;
 use crate::pool::Pool;
 use crate::logger;
 use crate::pool_factory;
-use crate::payload_structs;
+use crate::msg_structs;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
@@ -43,8 +43,7 @@ pub struct Market {
 
 #[ext_contract]
 pub trait CollateralToken {
-    fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: AccountId, amount: U128);
-    fn transfer(&mut self, receiver_id: AccountId, amount: U128);
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 
@@ -218,9 +217,10 @@ impl Protocol {
 
         if fees_earned > 0 {
             PromiseOrValue::Promise(
-                collateral_token::transfer(
-                    env::predecessor_account_id(),
+                collateral_token::ft_transfer(
+                    env::predecessor_account_id(), 
                     fees_earned.into(),
+                    None,
                     &market.pool.collateral_token_id,
                     0,
                     GAS_BASE_COMPUTE
@@ -255,9 +255,10 @@ impl Protocol {
         self.markets.replace(market_id.into(), &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::transfer(
-            env::predecessor_account_id(),
+        collateral_token::ft_transfer(
+            env::predecessor_account_id(), 
             U128(collateral_out - escrowed),
+            None,
             &market.pool.collateral_token_id,
             0,
             GAS_BASE_COMPUTE
@@ -285,9 +286,10 @@ impl Protocol {
             payout
         );
         if payout > 0 {
-                collateral_token::transfer(
-                    env::predecessor_account_id(),
+                collateral_token::ft_transfer(
+                    env::predecessor_account_id(), 
                     payout.into(),
+                    None,
                     &market.pool.collateral_token_id,
                     0,
                     GAS_BASE_COMPUTE
@@ -298,30 +300,30 @@ impl Protocol {
     }
 
 
+    // Callback for collateral tokens
     #[payable]
-    pub fn on_receive_with_vault(
+    pub fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
-        vault_id: u64,
         amount: U128,
-        payload: String,
-    ) -> Promise {
+        msg: String,
+    ) -> U128 {
         self.assert_unpaused();
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
 
         let initial_storage = env::storage_usage();
-        let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
+        let parsed_msg: msg_structs::InitStruct = serde_json::from_str(msg.as_str()).expect("ERR_INCORRECT_JSON");
 
-        let prom: Promise;
-        match parsed_payload.function.as_str() {
-            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args),
-            "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
+        let amount_used = match parsed_msg.function.as_str() {
+            "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
+            "buy" => self.buy(&sender_id, amount, parsed_msg.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
 
         self.refund_storage(initial_storage, sender_id);
-        prom
+        // amount_used.into()
+        0.into()
     }
 
     /*** Gov setters ***/
@@ -333,8 +335,8 @@ impl Protocol {
         market_id: U64,
         payout_numerator: Option<Vec<U128>>
     ) {
-        let initial_storage = env::storage_usage();
         self.assert_gov();
+        let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
@@ -420,9 +422,10 @@ impl Protocol {
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::transfer(
+        collateral_token::ft_transfer(
             env::predecessor_account_id(),
             to_burn,
+            None,
             &market.pool.collateral_token_id,
             0,
             GAS_BASE_COMPUTE
@@ -446,11 +449,10 @@ impl Protocol {
     fn add_liquidity(
         &mut self,
         sender: &AccountId,
-        vault_id: u64,
         total_in: u128,
         args: serde_json::Value,
-    ) -> Promise {
-        let parsed_args: payload_structs::AddLiquidity = payload_structs::from_args(args);
+    ) -> u128 {
+        let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
                 Some(weight_indication
@@ -474,24 +476,17 @@ impl Protocol {
         );
         self.markets.replace(parsed_args.market_id.into(), &market);
 
-        collateral_token::withdraw_from_vault(
-            vault_id,
-            env::current_account_id(),
-            total_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
+        // If we get to this point, all collateral is used
+        0
     }
 
     fn buy(
         &mut self,
         sender: &AccountId,
-        vault_id: u64,
-        collateral_in: u128,
+        collateral_in: u128, 
         args: serde_json::Value,
-    ) -> Promise {
-        let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
+    ) -> u128 {
+        let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
@@ -506,14 +501,8 @@ impl Protocol {
 
         self.markets.replace(parsed_args.market_id.into(), &market);
 
-        collateral_token::withdraw_from_vault(
-            vault_id,
-            env::current_account_id(),
-            collateral_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
+        // If we get to this point, all collateral is used
+        0
     }
 
     fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
