@@ -42,8 +42,7 @@ near_sdk_sim::lazy_static! {
 }
 
 pub fn init(
-    initial_balance: u128,
-    gov_id: AccountId,
+    gov_id: AccountId
 ) -> (UserAccount, ContractAccount<ProtocolContract>, AccountId, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
 
@@ -142,7 +141,7 @@ pub fn near_deposit(sender: &UserAccount, deposit: u128) {
     assert!(res.is_ok(), "wnear deposit failed with res: {:?}", res);
 }
 
-pub fn ft_balance_of(sender: &UserAccount, account_id: &AccountId) -> u128 {
+pub fn ft_balance_of(sender: &UserAccount, account_id: &AccountId) -> U128 {
     sender.view(
         PendingContractTx::new(
             TOKEN_CONTRACT_ID, 
@@ -174,7 +173,6 @@ pub fn transfer_unsafe(
         1,
         DEFAULT_GAS
     );
-    println!("t res {:?}", res);
 
     assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
 }
@@ -198,7 +196,7 @@ pub fn ft_transfer_call(
         1,
         DEFAULT_GAS
     );
-    println!("tc res {:?}", res);
+
     assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
 }
 

@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn add_liquidity_even_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
     let transfer_amount = to_token_denom(100);
 
     let market_id: U64 = create_market(&alice, &amm, 2, Some(U128(0)));
@@ -28,10 +28,9 @@ fn add_liquidity_even_liq_test() {
     let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
     assert_eq!(pool_token_balance, U128(seed_amount));
     let seeder_balance = ft_balance_of(&alice, &alice.account_id().to_string());
-    assert_eq!(seeder_balance, to_yocto("100000") - seed_amount - transfer_amount);
+    assert_eq!(seeder_balance, U128(to_yocto("100000") - seed_amount - transfer_amount));
     let amm_collateral_balance = ft_balance_of(&alice, &"amm".to_string());
-    
-    assert_eq!(amm_collateral_balance, seed_amount);
+    assert_eq!(amm_collateral_balance, U128(seed_amount));
 
     let join_args = json!({
         "function": "add_liquidity",
@@ -45,15 +44,15 @@ fn add_liquidity_even_liq_test() {
     assert_eq!(pool_token_balance_after_join, U128(to_token_denom(10)));
 
     let joiner_balance = ft_balance_of(&alice, &bob.account_id().to_string());
-    assert_eq!(joiner_balance, transfer_amount - seed_amount);
+    assert_eq!(joiner_balance, U128(transfer_amount - seed_amount));
     let amm_collateral_balance = ft_balance_of(&alice, &"amm".to_string());
-    assert_eq!(amm_collateral_balance, seed_amount * 2);
+    assert_eq!(amm_collateral_balance, U128(seed_amount * 2));
 }
 
 #[test]
 fn add_liquidity_uneven_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
     let transfer_amount = to_token_denom(100);
 
     let market_id: U64 = create_market(&alice, &amm, 3, Some(U128(0)));
@@ -115,7 +114,7 @@ fn add_liquidity_uneven_liq_test() {
 
 #[test]
 fn multiple_pool_exits_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     let transfer_amount = to_token_denom(100);
     assert_eq!(market_id, U64(0));
@@ -209,7 +208,7 @@ fn multiple_pool_exits_test() {
 
 #[test]
 fn join_zero_liq_test() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
     let transfer_amount = to_token_denom(100);
     assert_eq!(market_id, U64(0));
@@ -250,7 +249,7 @@ fn join_zero_liq_test() {
 
 #[test]
 fn add_liquidity_redeem() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
 
     // Fund Bob
     let transfer_amount = to_token_denom(100);
@@ -297,7 +296,7 @@ fn add_liquidity_redeem() {
  
     // Assert collateral balance
     let collateral_balance = ft_balance_of(&bob, &bob.account_id());
-    assert_eq!(collateral_balance, transfer_amount);
+    assert_eq!(collateral_balance, U128(transfer_amount));
     
     // Assert if shares are burned
     let outcome_balance_0: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
