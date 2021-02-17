@@ -275,7 +275,6 @@ impl Protocol {
         assert!(market.finalized, "ERR_NOT_FINALIZED");
 
         let payout = market.pool.payout(&env::predecessor_account_id(), &market.payout_numerator);
-        
         self.markets.replace(market_id.into(), &market);
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
