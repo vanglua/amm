@@ -254,7 +254,7 @@ fn add_liquidity_redeem() {
 
     // Fund Bob
     let transfer_amount = to_token_denom(100);
-    transfer_unsafe(&alice, bob.account_id().to_string(), transfer_amount);
+    transfer_unsafe(&alice, &bob.account_id(), transfer_amount);
 
     // Create / validate market
     let market_id: U64 = create_market(&bob, &amm, 2, Some(U128(0)));
@@ -296,7 +296,7 @@ fn add_liquidity_redeem() {
     assert_eq!(pool_token_balance, U128(0));
  
     // Assert collateral balance
-    let collateral_balance = ft_balance_of(bob, bob.account_id());
+    let collateral_balance = ft_balance_of(&bob, &bob.account_id());
     assert_eq!(collateral_balance, transfer_amount);
     
     // Assert if shares are burned

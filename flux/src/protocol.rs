@@ -312,17 +312,14 @@ impl Protocol {
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
 
-        let initial_storage = env::storage_usage();
         let parsed_msg: msg_structs::InitStruct = serde_json::from_str(msg.as_str()).expect("ERR_INCORRECT_JSON");
 
-        let amount_used = match parsed_msg.function.as_str() {
+        match parsed_msg.function.as_str() {
             "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
             "buy" => self.buy(&sender_id, amount, parsed_msg.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
 
-        self.refund_storage(initial_storage, sender_id);
-        // amount_used.into()
         0.into()
     }
 
@@ -451,7 +448,7 @@ impl Protocol {
         sender: &AccountId,
         total_in: u128,
         args: serde_json::Value,
-    ) -> u128 {
+    ) {
         let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
@@ -475,9 +472,6 @@ impl Protocol {
             weights_u128
         );
         self.markets.replace(parsed_args.market_id.into(), &market);
-
-        // If we get to this point, all collateral is used
-        0
     }
 
     fn buy(
@@ -485,7 +479,7 @@ impl Protocol {
         sender: &AccountId,
         collateral_in: u128, 
         args: serde_json::Value,
-    ) -> u128 {
+    ) {
         let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
@@ -500,9 +494,6 @@ impl Protocol {
         );
 
         self.markets.replace(parsed_args.market_id.into(), &market);
-
-        // If we get to this point, all collateral is used
-        0
     }
 
     fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
