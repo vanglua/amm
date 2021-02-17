@@ -5,7 +5,7 @@ use near_sdk::serde_json::json;
 use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
-fn test_invalid_market_payout() {
+fn test_uneven_lp_shares_solvency_tests() {
         // Init and get accounts
         let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("1"), "carol".to_string());
         
@@ -63,10 +63,9 @@ fn test_invalid_market_payout() {
         // Sell back into pool from LP
         let sell_res = call!(
             lp,
-            amm.sell(market_id, U128(25 / 10), 0, U128(buy_amt * 25 / 10)),
+            amm.sell(market_id, U128(to_token_denom(25) / 10), 0, U128(buy_amt * 100)),
             deposit = STORAGE_AMOUNT
         );
-
         assert!(sell_res.is_ok());
 
         // Resolute and payout
