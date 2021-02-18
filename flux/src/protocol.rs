@@ -78,6 +78,8 @@ impl Protocol {
             token_whitelist.insert(&account_id, &decimal);
         };
 
+        logger::log_whitelist(&token_whitelist);
+
         Self {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
@@ -386,6 +388,7 @@ impl Protocol {
             let account_id: AccountId = id.into();
             token_whitelist.insert(&account_id, &decimal);
         };
+        logger::log_whitelist(&token_whitelist);
         self.token_whitelist = token_whitelist
     }
 
@@ -397,6 +400,8 @@ impl Protocol {
         self.assert_gov();
         let account_id = to_add.into();
         self.token_whitelist.insert(&account_id, &decimals);
+        logger::log_whitelist(&self.token_whitelist);
+
     }
 
     #[payable]
