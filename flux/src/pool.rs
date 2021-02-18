@@ -219,12 +219,15 @@ impl Pool {
         let pool_token_supply = self.pool_token.total_supply();
         let sender_pool_token_balance = self.pool_token.get_balance(sender);
 
+        assert!(total_in <= sender_pool_token_balance, "ERR_INSUFFICIENT_BALANCE");
+
         let mut account = self.accounts.get(sender).expect("ERR_NO_ACCOUNT");
         let lp_token_exit_ratio = math::div_u128(self.collateral_denomination, total_in, sender_pool_token_balance);
 
         for (i, balance) in balances.iter().enumerate() {
             let outcome = i as u16;
-            let send_out = math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, *balance, total_in), pool_token_supply);
+            let send_out = math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, total_in, pool_token_supply), *balance);
+
             let current_spend = account.entries.get(&outcome).unwrap_or(0);
 
             let account_total_spent_on_outcome = account.lp_entries.get(&outcome).unwrap_or(0);
@@ -336,7 +339,7 @@ impl Pool {
         let total_supply = self.pool_token.total_supply();
         let ineligible_fee_amount = match total_supply {
             0 => amount,
-            _ => math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, self.fee_pool_weight, amount), total_supply)
+            _ => math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, self.fee_pool_weight, total_supply), amount)
         };
 
         // On transfer or burn
