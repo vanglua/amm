@@ -303,11 +303,55 @@ fn add_liquidity_redeem() {
     assert_eq!(outcome_balance_1, U128(0));
 }
 
+#[test]
+fn liquidity_exit_scene() {
+    let (_master_account, amm, _token, alice, bob, _carol) = init("carol".to_string());
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(swap_fee()));
 
-// TODO: test exit scenarios:
-// join pool w 20000000000000000000
-// buy 100000000000000000
-// buy 1000000000000000000000000
-// join pool w 1000000000000000000
-// join pool w 1000000000000000000000000
-// exit pool w pool token balance of 40408003137014814449
+    assert_eq!(market_id, U64(0));
+
+    let seed_amount = 20000000000000000000;
+
+    let weights = Some(vec![U128(70000000), U128(30000000)]);
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args.to_string());
+
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(seed_amount));
+
+    let buy_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(0)
+        }
+    }).to_string();
+
+    
+    let buy_res = ft_transfer_call(&alice, 100000000000000000, buy_args.to_string());
+    let buy_res = ft_transfer_call(&alice, 1000000000000000000000000, buy_args);
+    
+    let add_more_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+        }
+    }).to_string();
+    ft_transfer_call(&alice, 1000000000000000000, add_more_liquidity_args.to_string());
+    ft_transfer_call(&alice, 1000000000000000000000000, add_more_liquidity_args);
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+
+    let seed_exit_res = call!(
+        alice,
+        amm.exit_pool(market_id, pool_token_balance),
+        deposit = STORAGE_AMOUNT
+    );
+}

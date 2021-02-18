@@ -304,6 +304,9 @@ fn swap_multi_sell_test() {
         deposit = STORAGE_AMOUNT
     );
 
+    assert!(sell_res_trader1.is_ok(), "sell res trader 1 failed {:?}", sell_res_trader1);
+    assert!(sell_res_trader2.is_ok(), "sell res trader 2 failed {:?}", sell_res_trader2);
+
     // Check balances with escrow both ways
     // Get updated balances
     let trader1_final_balance: u128 = ft_balance_of(&lp, &trader1.account_id()).into();
@@ -524,6 +527,7 @@ fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_
     assert_eq!(expected_target_buyer_balance, u128::from(target_buyer_balance));
     assert_eq!(expected_other_buyer_balance, u128::from(other_buyer_balance));
 
+    let pre_redeem_balance = ft_balance_of(&bob, &bob.account_id());
     // Redeem liquidity
     let redeem_call = call!(
         bob,
@@ -535,7 +539,8 @@ fn redeem_collat_helper(target_price_a: U128, target_price_b: U128, token_value_
     }
 
     // Assert collateral balance
-    let expected_collateral_balance = 999999999999999999999999999;
+
+    let expected_collateral_balance = std::cmp::min(999999999999999999999999999, u128::from(pre_redeem_balance)  + token_value_80_20);
     let collateral_balance: u128 = ft_balance_of(&alice, &bob.account_id()).into();
     assert_eq!(collateral_balance, expected_collateral_balance);
 
