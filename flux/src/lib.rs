@@ -16,7 +16,7 @@ construct_uint! {
 /** core */
 pub mod protocol;
 mod helper;
-mod payload_structs;
+mod msg_structs;
 mod pool_factory;
 mod pool;
 mod outcome_token;

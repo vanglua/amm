@@ -18,7 +18,8 @@ use near_sdk::{
     AccountId,
     env,
     collections::{
-        Vector
+        Vector,
+        LookupMap
     },
 };
 
@@ -27,13 +28,10 @@ use crate::helper::*;
 use crate::pool::Pool;
 use crate::logger;
 use crate::pool_factory;
-use crate::payload_structs;
+use crate::msg_structs;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
-const TOKEN_DENOM: u128 = 1_000_000_000_000_000_000; // 1e18
-const MAX_FEE: u128 = TOKEN_DENOM / 20; // max fee is 5%
-const MIN_FEE: u128 = TOKEN_DENOM / 10_000; // max fee is %0.01
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {
@@ -43,13 +41,9 @@ pub struct Market {
     pub finalized: bool,
 }
 
-impl Market {
-}
-
 #[ext_contract]
 pub trait CollateralToken {
-    fn withdraw_from_vault(&mut self, vault_id: u64, receiver_id: AccountId, amount: U128);
-    fn transfer(&mut self, receiver_id: AccountId, amount: U128);
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 
@@ -58,7 +52,8 @@ pub trait CollateralToken {
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>,
-    token_whitelist: Vec<AccountId>
+    token_whitelist: LookupMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in
+    paused: bool
 }
 
 #[near_bindgen]
@@ -70,13 +65,26 @@ impl Protocol {
      * @param token_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
-    pub fn init(gov: ValidAccountId, token_whitelist: Vec<ValidAccountId>) -> Self {
+    pub fn init(
+        gov: ValidAccountId, 
+        tokens: Vec<ValidAccountId>, 
+        decimals: Vec<u32>
+    ) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
-        
+        assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
+        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+
+        for (i, id) in tokens.into_iter().enumerate() {
+            let decimal = decimals[i];
+            let account_id: AccountId = id.into();
+            token_whitelist.insert(&account_id, &decimal);
+        };
+
         Self {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
-            token_whitelist: token_whitelist.into_iter().map(|t| t.into()).collect()
+            token_whitelist, 
+            paused: false
         }
     }
 
@@ -153,19 +161,21 @@ impl Protocol {
         collateral_token_id: AccountId,
         swap_fee: U128,
     ) -> U64 {
+        self.assert_unpaused();
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.markets.len();
-        assert!(self.token_whitelist.contains(&collateral_token_id), "ERR_INVALID_COLLATERAL");
+        let token_decimals = self.token_whitelist.get(&collateral_token_id);
+        assert!(token_decimals.is_some(), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
         assert!(end_time > ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
-        assert!(swap_fee == 0 || (swap_fee <= MAX_FEE && swap_fee >= MIN_FEE), "ERR_INVALID_FEE");
         let initial_storage = env::storage_usage();
 
         let pool = pool_factory::new_pool(
             market_id,
             outcomes,
             collateral_token_id,
+            token_decimals.unwrap(),
             swap_fee
         );
 
@@ -192,6 +202,7 @@ impl Protocol {
         market_id: U64,
         total_in: U128,
     ) -> PromiseOrValue<bool> {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -206,11 +217,12 @@ impl Protocol {
 
         if fees_earned > 0 {
             PromiseOrValue::Promise(
-                collateral_token::transfer(
-                    env::predecessor_account_id(),
+                collateral_token::ft_transfer(
+                    env::predecessor_account_id(), 
                     fees_earned.into(),
+                    None,
                     &market.pool.collateral_token_id,
-                    0,
+                    1,
                     GAS_BASE_COMPUTE
                 )
             )
@@ -227,6 +239,7 @@ impl Protocol {
         outcome_target: u16,
         max_shares_in: U128
     ) -> Promise {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let collateral_out: u128 = collateral_out.into();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -242,11 +255,12 @@ impl Protocol {
         self.markets.replace(market_id.into(), &market);
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::transfer(
-            env::predecessor_account_id(),
+        collateral_token::ft_transfer(
+            env::predecessor_account_id(), 
             U128(collateral_out - escrowed),
+            None,
             &market.pool.collateral_token_id,
-            0,
+            1,
             GAS_BASE_COMPUTE
         )
     }
@@ -255,8 +269,9 @@ impl Protocol {
     pub fn claim_earnings(
         &mut self,
         market_id: U64
-    ){
-    // ) -> Promise {
+    ) {
+    // ) -> Promise { 
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(market.finalized, "ERR_NOT_FINALIZED");
@@ -266,17 +281,19 @@ impl Protocol {
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        // logger::log_claim_earnings(
-        //     market_id,
-        //     env::predecessor_account_id(),
-        //     payout
-        // );
+        logger::log_claim_earnings(
+            market_id,
+            env::predecessor_account_id(),
+            payout
+        );
+
         if payout > 0 {
-                collateral_token::transfer(
-                    env::predecessor_account_id(),
+                collateral_token::ft_transfer(
+                    env::predecessor_account_id(), 
                     payout.into(),
+                    None,
                     &market.pool.collateral_token_id,
-                    0,
+                    1,
                     GAS_BASE_COMPUTE
                 );
         } else {
@@ -285,48 +302,44 @@ impl Protocol {
     }
 
 
+    // Callback for collateral tokens
     #[payable]
-    pub fn on_receive_with_vault(
+    pub fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
-        vault_id: u64,
         amount: U128,
-        payload: String,
-    ) -> Promise {
+        msg: String,
+    ) -> U128 {
+        self.assert_unpaused();
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
 
-        let initial_storage = env::storage_usage();
-        let parsed_payload: payload_structs::InitStruct = serde_json::from_str(payload.as_str()).expect("ERR_INCORRECT_JSON");
+        let parsed_msg: msg_structs::InitStruct = serde_json::from_str(msg.as_str()).expect("ERR_INCORRECT_JSON");
 
-        let prom: Promise;
-        match parsed_payload.function.as_str() {
-            "add_liquidity" => prom = self.add_liquidity(&sender_id, vault_id, amount, parsed_payload.args),
-            "buy" => prom = self.buy(&sender_id, vault_id, amount, parsed_payload.args),
+        match parsed_msg.function.as_str() {
+            "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
+            "buy" => self.buy(&sender_id, amount, parsed_msg.args),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
 
-        self.refund_storage(initial_storage, sender_id);
-        prom
+        0.into()
     }
 
     /*** Gov setters ***/
-
-    // TODO: validate payout num arr
     #[payable]
     pub fn resolute_market(
         &mut self,
         market_id: U64,
         payout_numerator: Option<Vec<U128>>
     ) {
-        let initial_storage = env::storage_usage();
         self.assert_gov();
+        let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
             Some(v) => {
                 let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
-                assert_eq!(sum, TOKEN_DENOM, "ERR_INVALID_PAYOUT_SUM");
+                assert_eq!(sum, market.pool.collateral_denomination, "ERR_INVALID_PAYOUT_SUM");
                 assert_eq!(v.len(), market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR");
             },
             None => ()
@@ -348,20 +361,41 @@ impl Protocol {
         self.gov = new_gov.into();
     }
 
+    pub fn pause(&mut self) {
+        self.assert_gov();
+        self.paused = true;
+    }
+
+    pub fn unpause(&mut self) {
+        self.assert_gov();
+        self.paused = false;
+    }
+
     pub fn set_token_whitelist(
         &mut self,
-        whitelist: Vec<ValidAccountId>
+        tokens: Vec<ValidAccountId>, 
+        decimals: Vec<u32>
     ) {
         self.assert_gov();
-        self.token_whitelist = whitelist.into_iter().map(|t| t.into()).collect();
+        assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
+        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+
+        for (i, id) in tokens.into_iter().enumerate() {
+            let decimal = decimals[i];
+            let account_id: AccountId = id.into();
+            token_whitelist.insert(&account_id, &decimal);
+        };
+        self.token_whitelist = token_whitelist
     }
 
     pub fn add_to_token_whitelist(
         &mut self,
-        to_add: ValidAccountId
+        to_add: ValidAccountId,
+        decimals: u32
     ) {
         self.assert_gov();
-        self.token_whitelist.push(to_add.into());
+        let account_id = to_add.into();
+        self.token_whitelist.insert(&account_id, &decimals);
     }
 
     #[payable]
@@ -370,12 +404,13 @@ impl Protocol {
         market_id: U64,
         to_burn: U128
     ) -> Promise {
+        self.assert_unpaused();
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_MARKET_FINALIZED");
 
-        market.pool.burn_outcome_tokens_redeem_collateral(
+        let escrowed = market.pool.burn_outcome_tokens_redeem_collateral(
             &env::predecessor_account_id(),
             to_burn.into()
         );
@@ -384,11 +419,13 @@ impl Protocol {
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::transfer(
+        let payout = u128::from(to_burn) - escrowed;
+        collateral_token::ft_transfer(
             env::predecessor_account_id(),
-            to_burn,
+            payout.into(),
+            None,
             &market.pool.collateral_token_id,
-            0,
+            1,
             GAS_BASE_COMPUTE
         )
     }
@@ -403,14 +440,17 @@ impl Protocol {
         self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
     }
 
+    fn assert_unpaused(&self) {
+        assert!(!self.paused, "ERR_PROTCOL_PAUSED")
+    }
+
     fn add_liquidity(
         &mut self,
         sender: &AccountId,
-        vault_id: u64,
         total_in: u128,
         args: serde_json::Value,
-    ) -> Promise {
-        let parsed_args: payload_structs::AddLiquidity = payload_structs::from_args(args);
+    ) {
+        let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
                 Some(weight_indication
@@ -433,25 +473,15 @@ impl Protocol {
             weights_u128
         );
         self.markets.replace(parsed_args.market_id.into(), &market);
-
-        collateral_token::withdraw_from_vault(
-            vault_id,
-            env::current_account_id(),
-            total_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
     }
 
     fn buy(
         &mut self,
         sender: &AccountId,
-        vault_id: u64,
-        collateral_in: u128,
+        collateral_in: u128, 
         args: serde_json::Value,
-    ) -> Promise {
-        let parsed_args: payload_structs::Buy = payload_structs::from_args(args);
+    ) {
+        let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
@@ -465,15 +495,6 @@ impl Protocol {
         );
 
         self.markets.replace(parsed_args.market_id.into(), &market);
-
-        collateral_token::withdraw_from_vault(
-            vault_id,
-            env::current_account_id(),
-            collateral_in.into(),
-            &market.pool.collateral_token_id,
-            0,
-            GAS_BASE_COMPUTE
-        )
     }
 
     fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
