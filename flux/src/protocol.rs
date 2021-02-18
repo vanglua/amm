@@ -19,7 +19,7 @@ use near_sdk::{
     env,
     collections::{
         Vector,
-        LookupMap
+        UnorderedMap
     },
 };
 
@@ -46,19 +46,17 @@ pub trait CollateralToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
-
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>,
-    token_whitelist: LookupMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in
+    token_whitelist: UnorderedMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in TODO: change to iterable or hashmap
     paused: bool
 }
 
 #[near_bindgen]
 impl Protocol {
-
     /**
      * @notice Initialize the contract by setting the
      * @param gov is the account_id of the account with governance privilages
@@ -72,7 +70,7 @@ impl Protocol {
     ) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
-        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+        let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
         for (i, id) in tokens.into_iter().enumerate() {
             let decimal = decimals[i];
@@ -95,6 +93,10 @@ impl Protocol {
     pub fn get_pool_swap_fee(&self, market_id: U64) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.get_swap_fee())
+    }
+
+    pub fn get_token_whitelist(&self) -> Vec<(AccountId, u32)> {
+        self.token_whitelist.to_vec()
     }
 
     pub fn get_pool_balances(
@@ -269,8 +271,7 @@ impl Protocol {
     pub fn claim_earnings(
         &mut self,
         market_id: U64
-    ) {
-    // ) -> Promise { 
+    ) -> Promise { 
         self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -295,7 +296,7 @@ impl Protocol {
                     &market.pool.collateral_token_id,
                     1,
                     GAS_BASE_COMPUTE
-                );
+                )
         } else {
             panic!("ERR_NO_PAYOUT");
         }
@@ -378,7 +379,7 @@ impl Protocol {
     ) {
         self.assert_gov();
         assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
-        let mut token_whitelist: LookupMap<AccountId, u32> = LookupMap::new(b"wl".to_vec());
+        let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
         for (i, id) in tokens.into_iter().enumerate() {
             let decimal = decimals[i];

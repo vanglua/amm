@@ -263,7 +263,8 @@ impl Pool {
             let price_paid_per_share = math::div_u128(self.collateral_denomination, spent_on_outcome, user_balance);
 
             // subtract sold off tokens from entries
-            let new_entry_balance = spent_on_outcome - math::mul_u128(self.collateral_denomination, price_paid_per_share, to_burn);
+            let redeemed_spent = math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, to_burn, user_balance), spent_on_outcome);
+            let new_entry_balance = spent_on_outcome - redeemed_spent;
             account.entries.insert(&outcome, &new_entry_balance);
 
             // Burn outcome tokens accordingly 
@@ -284,7 +285,7 @@ impl Pool {
                 let delta = self.collateral_denomination - avg_price_paid;
                 let to_escrow = math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
                 account.resolution_escrow.valid += to_escrow;
-                to_escrow
+                to_escrow + 1
             }, 
             std::cmp::Ordering::Equal => 0
         };
