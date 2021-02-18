@@ -5,7 +5,8 @@ use near_sdk::{
         U64,
         U128,
     },
-    serde_json::json
+    serde_json::json,
+    collections::UnorderedMap
 };
 
 use crate::protocol::{ Market };
@@ -28,6 +29,21 @@ pub fn log_pool(pool: &Pool) {
                 "total_withdrawn_fees": U128(pool.total_withdrawn_fees),
                 "fee_pool_weight": U128(pool.fee_pool_weight),
                 "block_height": U64(env::block_index()),
+			}
+		})
+		.to_string()
+		.as_bytes()
+	);
+}
+
+pub fn log_whitelist(whitelist: &UnorderedMap<AccountId, u32>) {
+    env::log(
+		json!({
+            "type": "pools".to_string(),
+            "action": "update",
+            "cap_id": "wl",
+			"params": {
+                "whitelist": whitelist.to_vec()
 			}
 		})
 		.to_string()
