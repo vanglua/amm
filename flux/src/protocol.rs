@@ -286,7 +286,7 @@ impl Protocol {
             env::predecessor_account_id(),
             payout
         );
-        env::log(format!("trying to return: {:?}", payout).as_bytes());
+
         if payout > 0 {
                 collateral_token::ft_transfer(
                     env::predecessor_account_id(), 

@@ -302,3 +302,12 @@ fn add_liquidity_redeem() {
     assert_eq!(outcome_balance_0, U128(0));
     assert_eq!(outcome_balance_1, U128(0));
 }
+
+
+// TODO: test exit scenarios:
+// join pool w 20000000000000000000
+// buy 100000000000000000
+// buy 1000000000000000000000000
+// join pool w 1000000000000000000
+// join pool w 1000000000000000000000000
+// exit pool w pool token balance of 40408003137014814449
