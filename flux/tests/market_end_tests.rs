@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn test_valid_market_resolution() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
 
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
@@ -21,7 +21,7 @@ fn test_valid_market_resolution() {
             "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let payout_num = vec![U128(0), U128(to_token_denom(1))];
     
@@ -44,8 +44,7 @@ fn test_valid_market_resolution() {
 
 #[test]
 fn test_valid_market_payout() {
-    let (master_account, amm, token, alice, bob, carol) = init(to_yocto("100000"), "carol".to_string());
-    transfer_unsafe(&token, &alice, bob.account_id().to_string(), to_token_denom(10000));
+    let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());
     let market_id = create_market(&alice, &amm, 2, Some(U128(0)));
     let target_price = U128(to_token_denom(5) / 10);
     let seed_amount = to_token_denom(100);
@@ -59,7 +58,7 @@ fn test_valid_market_payout() {
             "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let payout_num = vec![U128(0), U128(to_token_denom(1))];
     let buy_a_args = json!({
@@ -78,15 +77,15 @@ fn test_valid_market_payout() {
             "min_shares_out": U128(to_token_denom(8) / 10)
         }
     }).to_string();
-    transfer_with_vault(&token, &bob, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &bob, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    transfer_with_vault(&token, &bob, "amm".to_string(), buy_amt, buy_a_args.to_string());
-    transfer_with_vault(&token, &bob, "amm".to_string(), buy_amt, buy_b_args.to_string());
-    let pre_claim_balance = get_balance(&token, bob.account_id());
+    ft_transfer_call(&bob, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&bob, buy_amt, buy_b_args.to_string());
+    ft_transfer_call(&bob, buy_amt, buy_a_args.to_string());
+    ft_transfer_call(&bob, buy_amt, buy_b_args.to_string());
+    let pre_claim_balance: u128 = ft_balance_of(&master_account, &bob.account_id()).into();
     let outcome_balance_0: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
     let outcome_balance_1: U128 = view!(amm.get_share_balance(&bob.account_id(), market_id, 0)).unwrap_json();
 
-    assert_eq!(pre_claim_balance, to_token_denom(10000) - buy_amt * 4, "unexpected balance");
+    assert_eq!(pre_claim_balance, init_balance()- buy_amt * 4, "unexpected balance");
 
     let res = call!(
         carol,
@@ -104,8 +103,8 @@ fn test_valid_market_payout() {
 
     assert!(res.is_ok(), "ERR_TX_FAILED");
     
-    let claimer_balance = get_balance(&token, bob.account_id());
-    let expected_claimer_balance = 10000019603038518995487419933_u128;
+    let claimer_balance: u128 = ft_balance_of(&master_account, &bob.account_id()).into();
+    let expected_claimer_balance = 1000019603038518995487419933_u128;
     assert_eq!(claimer_balance, expected_claimer_balance, "unexpected payout");
     
     let res = call!(
@@ -114,8 +113,8 @@ fn test_valid_market_payout() {
         deposit = STORAGE_AMOUNT
     );
 
-    let second_claim_balance = get_balance(&token, bob.account_id());
-    let expected_second_claim_balance = 10_000_019_603_038_518_995_487_u128;
+    let second_claim_balance: u128 = ft_balance_of(&master_account, &bob.account_id()).into();
+    let expected_second_claim_balance = 1000019603038518995487419933_u128;
     assert_eq!(second_claim_balance, expected_second_claim_balance, "unexpected payout");
 }
 
@@ -123,21 +122,18 @@ fn test_valid_market_payout() {
 #[test]
 fn test_invalid_market_payout() {
         // Get accounts
-        let (_master_account, amm, token, lp, trader, gov) = init(to_yocto("100000"), "carol".to_string());
-        
-        // Fund accounts
-        transfer_unsafe(&token, &lp, trader.account_id(), to_token_denom(10000));
+        let (master_account, amm, token, lp, trader, gov) = init("carol".to_string());
 
         // Get initial balances
-        let lp_init_balance = get_balance(&token, lp.account_id());
-        let trader_init_balance = get_balance(&token, trader.account_id());
+        let lp_init_balance: u128 = ft_balance_of(&master_account, &lp.account_id()).into();
+        let trader_init_balance: u128 = ft_balance_of(&master_account, &trader.account_id()).into();
         let fees = 0;
         
         // Calc expected balances after invalid resolution
         // Expect bob to have init_bal - fees
         let expected_lp_final_balance = lp_init_balance + fees;
         // Expect LP to have init_bal + fees
-        let expected_trader_final_balance = trader_init_balance - fees;
+        let expected_trader_final_balance = init_balance() - fees;
         // Expect amm to have a balance of 0
         let expected_amm_final_balance = 0;
         
@@ -158,9 +154,9 @@ fn test_invalid_market_payout() {
                 "weight_indication": weights
             }
         }).to_string();
-        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amount, add_liquidity_args);
+        ft_transfer_call(&lp, seed_amount, add_liquidity_args);
 
-        let amm_final_balance = get_balance(&token, "amm".to_string());
+        let amm_final_balance: u128 = ft_balance_of(&master_account, &"amm".to_string()).into();
         assert_eq!(amm_final_balance, seed_amount);
 
         // Trade with trader x amount of times
@@ -181,10 +177,10 @@ fn test_invalid_market_payout() {
             }
         }).to_string();
         
-        transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-        transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string());
-        transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_a_args.to_string());
-        transfer_with_vault(&token, &trader, "amm".to_string(), buy_amt, buy_b_args.to_string()); 
+        ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+        ft_transfer_call(&trader, buy_amt, buy_b_args.to_string());
+        ft_transfer_call(&trader, buy_amt, buy_a_args.to_string());
+        ft_transfer_call(&trader, buy_amt, buy_b_args.to_string()); 
 
         // Sell back for buy amount
         let sell_res = call!(
@@ -221,9 +217,9 @@ fn test_invalid_market_payout() {
         );
 
         // Get updated balances
-        let lp_final_balance = get_balance(&token, lp.account_id());
-        let trader_final_balance = get_balance(&token, trader.account_id());
-        let amm_final_balance = get_balance(&token, "amm".to_string());
+        let lp_final_balance: u128 = ft_balance_of(&master_account, &lp.account_id()).into();
+        let trader_final_balance: u128 = ft_balance_of(&master_account, &trader.account_id()).into();
+        let amm_final_balance: u128 = ft_balance_of(&master_account, &"amm".to_string()).into();
         
         // Assert balances
         assert_eq!(lp_final_balance, expected_lp_final_balance);

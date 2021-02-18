@@ -222,7 +222,7 @@ impl Protocol {
                     fees_earned.into(),
                     None,
                     &market.pool.collateral_token_id,
-                    0,
+                    1,
                     GAS_BASE_COMPUTE
                 )
             )
@@ -260,7 +260,7 @@ impl Protocol {
             U128(collateral_out - escrowed),
             None,
             &market.pool.collateral_token_id,
-            0,
+            1,
             GAS_BASE_COMPUTE
         )
     }
@@ -269,7 +269,8 @@ impl Protocol {
     pub fn claim_earnings(
         &mut self,
         market_id: U64
-    ) -> Promise {
+    ) {
+    // ) -> Promise { 
         self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
@@ -285,15 +286,16 @@ impl Protocol {
             env::predecessor_account_id(),
             payout
         );
+        env::log(format!("trying to return: {:?}", payout).as_bytes());
         if payout > 0 {
                 collateral_token::ft_transfer(
                     env::predecessor_account_id(), 
                     payout.into(),
                     None,
                     &market.pool.collateral_token_id,
-                    0,
+                    1,
                     GAS_BASE_COMPUTE
-                )
+                );
         } else {
             panic!("ERR_NO_PAYOUT");
         }
@@ -324,8 +326,6 @@ impl Protocol {
     }
 
     /*** Gov setters ***/
-
-    // TODO: validate payout num arr
     #[payable]
     pub fn resolute_market(
         &mut self,
@@ -410,7 +410,7 @@ impl Protocol {
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_MARKET_FINALIZED");
 
-        market.pool.burn_outcome_tokens_redeem_collateral(
+        let escrowed = market.pool.burn_outcome_tokens_redeem_collateral(
             &env::predecessor_account_id(),
             to_burn.into()
         );
@@ -419,12 +419,13 @@ impl Protocol {
 
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
+        let payout = u128::from(to_burn) - escrowed;
         collateral_token::ft_transfer(
             env::predecessor_account_id(),
-            to_burn,
+            payout.into(),
             None,
             &market.pool.collateral_token_id,
-            0,
+            1,
             GAS_BASE_COMPUTE
         )
     }

@@ -6,7 +6,7 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn pool_initial_pricing_test() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init("carol".to_string());
     let seed_amount = to_token_denom(100);
     let half = to_token_denom(5) / 10;
     let forty = to_token_denom(4) / 10;
@@ -25,7 +25,7 @@ fn pool_initial_pricing_test() {
             "weight_indication": even_weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let even_price: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
     assert_eq!(u128::from(even_price), half);
@@ -40,7 +40,7 @@ fn pool_initial_pricing_test() {
             "weight_indication": uneven_weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let expected_0 = to_token_denom(6) / 10;
     let expected_1 = to_token_denom(4) / 10;
@@ -54,7 +54,7 @@ fn pool_initial_pricing_test() {
 #[test]
 fn pricing_multi_outcome_pool_test() {
     // Even pool
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init("carol".to_string());
     let seed_amount = to_token_denom(100);
     
     let market_id = create_market(&alice, &amm, 3, Some(U128(0)));
@@ -69,7 +69,7 @@ fn pricing_multi_outcome_pool_test() {
             "weight_indication": even_weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let even_price: U128 = view!(
         amm.get_spot_price_sans_fee(market_id, 1)
@@ -99,7 +99,7 @@ fn pricing_multi_outcome_pool_test() {
             "weight_indication": uneven_weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
     let bal_0 = test_utils::math::mul_u128(token_denom(), twenty, collat);
     let bal_1 = test_utils::math::mul_u128(token_denom(), twenty, collat);
@@ -135,7 +135,7 @@ fn pricing_multi_outcome_pool_test() {
 
 #[test]
 fn pricing_fee_test_calc() {
-    let (_master_account, amm, token, alice, _bob, _carol) = init(to_yocto("100000"), "carol".to_string());
+    let (_master_account, amm, token, alice, _bob, _carol) = init("carol".to_string());
 
     let half = to_token_denom(1) / 2;
     let seed_amount = to_token_denom(100);
@@ -150,7 +150,7 @@ fn pricing_fee_test_calc() {
             "weight_indication": weights
         }
     }).to_string();
-    transfer_with_vault(&token, &alice, "amm".to_string(), seed_amount, add_liquidity_args);
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args);
     
     let even_price_wrapped: U128 = view!(amm.get_spot_price_sans_fee(market_id, 1)).unwrap_json();
     let swap_fee_wrapped: U128 = view!(amm.get_pool_swap_fee(market_id)).unwrap_json();

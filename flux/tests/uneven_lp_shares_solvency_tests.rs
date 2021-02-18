@@ -7,16 +7,12 @@ use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 #[test]
 fn test_uneven_lp_shares_solvency_tests() {
         // Init and get accounts
-        let (_master_account, amm, token, lp, trader1, trader2) = init(to_yocto("100000"), "carol".to_string());
-        
-        // Fund accounts  lp trader1 trader 1
-        transfer_unsafe(&token, &lp, trader1.account_id(), to_token_denom(10000));
-        transfer_unsafe(&token, &lp, trader2.account_id(), to_token_denom(10000));
+        let (_master_account, amm, token, lp, trader1, trader2) = init("carol".to_string());
         
         // Record balances before any trading happens
-        let lp_init_balance = get_balance(&token, lp.account_id());
-        let trader1_init_balance = get_balance(&token, trader1.account_id());
-        let trader2_init_balance = get_balance(&token, trader2.account_id());
+        let lp_init_balance: u128 = ft_balance_of(&lp, &lp.account_id()).into();
+        let trader1_init_balance: u128 = ft_balance_of(&lp, &trader1.account_id()).into();
+        let trader2_init_balance: u128 = ft_balance_of(&lp, &trader2.account_id()).into();
         
         // Seed / trade parameters
         let weights = vec![U128(to_token_denom(3) / 10), U128(to_token_denom(7) / 10)];
@@ -34,7 +30,7 @@ fn test_uneven_lp_shares_solvency_tests() {
                 "weight_indication": weights
             }
         }).to_string();
-        transfer_with_vault(&token, &lp, "amm".to_string(), seed_amount, add_liquidity_args);
+        ft_transfer_call(&lp, seed_amount, add_liquidity_args);
         
         // assert expected price for 0 & 1 (70 | 30)
         let price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
@@ -54,11 +50,11 @@ fn test_uneven_lp_shares_solvency_tests() {
         }).to_string();
 
         // Buy some extra shares from lp accounts
-        transfer_with_vault(&token, &lp, "amm".to_string(), buy_amt, buy_a_args.to_string());
+        ft_transfer_call(&lp, buy_amt, buy_a_args.to_string());
 
         // Increase price by buying from two subsequent accounts
-        transfer_with_vault(&token, &trader1, "amm".to_string(), buy_amt, buy_a_args.to_string());
-        transfer_with_vault(&token, &trader2, "amm".to_string(), buy_amt, buy_a_args.to_string());
+        ft_transfer_call(&trader1, buy_amt, buy_a_args.to_string());
+        ft_transfer_call(&trader2, buy_amt, buy_a_args.to_string());
 
         // Sell back into pool from LP
         let sell_res = call!(
@@ -100,10 +96,10 @@ fn test_uneven_lp_shares_solvency_tests() {
         assert!(lp_claim_res.is_ok());
         
         // Get updated balances
-        let lp_final_balance = get_balance(&token, lp.account_id());
-        let trader1_final_balance = get_balance(&token, trader1.account_id());
-        let trader2_final_balance = get_balance(&token, trader2.account_id());
-        let amm_final_balance = get_balance(&token, "amm".to_string());
+        let lp_final_balance: u128 = ft_balance_of(&lp, &lp.account_id()).into();
+        let trader1_final_balance: u128 = ft_balance_of(&lp, &trader1.account_id()).into();
+        let trader2_final_balance: u128 = ft_balance_of(&lp, &trader2.account_id()).into();
+        let amm_final_balance: u128 = ft_balance_of(&lp, &"amm".to_string()).into();
         
         // Assert that all balances are back to where they started
         assert_eq!(lp_final_balance, lp_init_balance);

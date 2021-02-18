@@ -248,7 +248,7 @@ impl Pool {
         &mut self,
         sender: &AccountId,
         to_burn: u128
-    )  {
+    ) -> u128 {
         let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCES");
 
         let avg_price_paid = self.outcome_tokens.iter().fold(0, |sum, (outcome, mut token)| {
@@ -271,20 +271,25 @@ impl Pool {
 
         // If the user paid less than 1 they have the right to claim the difference if the market turns out valid
         // If the users paid more than 1 they will have the right to claim the difference if the market turns out invalid
-        match avg_price_paid.cmp(&self.collateral_denomination) {
+        let in_escrow = match avg_price_paid.cmp(&self.collateral_denomination) {
             std::cmp::Ordering::Greater => {
                 let delta = avg_price_paid - self.collateral_denomination;
                 account.resolution_escrow.invalid += math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                0
             },
             std::cmp::Ordering::Less => {
                 let delta = self.collateral_denomination - avg_price_paid;
-                account.resolution_escrow.valid += math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                let to_escrow = math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                account.resolution_escrow.valid += to_escrow;
+                to_escrow
             }, 
-            std::cmp::Ordering::Equal => ()
-        }
+            std::cmp::Ordering::Equal => 0
+        };
 
         // Store updated account
         self.accounts.insert(sender, &account);
+
+        in_escrow
     }
 
     // move to view impl

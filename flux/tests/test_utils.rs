@@ -85,13 +85,13 @@ pub fn init(
     
     let alice = master_account.create_user("alice".to_string(), to_yocto("10000"));
     storage_deposit(&alice, storage_amount.into(), None);
-    near_deposit(&alice, to_yocto("1000"));
+    near_deposit(&alice, init_balance());
     let bob = master_account.create_user("bob".to_string(), to_yocto("10000"));
     storage_deposit(&bob, storage_amount.into(), None);
-    near_deposit(&bob, to_yocto("1000"));
+    near_deposit(&bob, init_balance());
     let carol = master_account.create_user("carol".to_string(), to_yocto("10000"));
     storage_deposit(&carol, storage_amount.into(), None);
-    near_deposit(&carol, to_yocto("1000"));
+    near_deposit(&carol, init_balance());
 
     (master_account, amm_contract, TOKEN_CONTRACT_ID.to_string(), alice, bob, carol)
 }
@@ -109,6 +109,10 @@ pub fn get_storage_amount(sender: &UserAccount) -> U128 {
 
 pub fn token_denom() -> u128 {
     to_yocto("1")
+}
+
+pub fn init_balance() -> u128 {
+    to_yocto("1000")
 }
 
 pub fn storage_deposit(sender: &UserAccount, deposit: u128, to_register: Option<AccountId>) {
@@ -236,11 +240,10 @@ pub fn swap_fee() -> U128 {
 
 pub fn product_of(nums: &Vec<U128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
-    let mut product = 0;
-    for price in nums.to_vec() {
-        product = math::mul_u128(token_denom(),token_denom(), u128::from(price));
-    }
-    product
+    nums.iter().fold(token_denom(), |prod, &num| {
+        let num_u128: u128 = num.into();
+        math::mul_u128(token_denom(), prod, num_u128)
+    })
 }
 
 pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
