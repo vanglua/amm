@@ -336,7 +336,7 @@ impl Protocol {
         payout_numerator: Option<Vec<U128>>
     ) {
         self.assert_gov();
-        let initial_storage = env::storage_usage();
+        // let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         match &payout_numerator {
@@ -351,7 +351,7 @@ impl Protocol {
         market.payout_numerator = payout_numerator;
         market.finalized = true;
         self.markets.replace(market_id.into(), &market);
-        self.refund_storage(initial_storage, env::predecessor_account_id());
+        // self.refund_storage(initial_storage, env::predecessor_account_id());
 
         logger::log_market_status(&market);
     }
