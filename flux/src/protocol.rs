@@ -192,7 +192,7 @@ impl Protocol {
             finalized: false
         };
 
-        logger::log_market(&market, description, extra_info, outcome_tags, categories);
+        logger::log_create_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
         
         self.markets.push(&market);

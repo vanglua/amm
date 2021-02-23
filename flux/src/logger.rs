@@ -12,6 +12,7 @@ use near_sdk::{
 use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
+use crate::helper::{ ns_to_ms };
 
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {
@@ -167,7 +168,7 @@ pub fn log_user_balance(token: &MintableToken, account_id: &AccountId, new_balan
 
 
 // NEW_MARKET env log
-pub fn log_market(
+pub fn log_create_market(
     market: &Market,
     description: String,  
     extra_info: String,  
@@ -188,6 +189,7 @@ pub fn log_market(
                 "finalized": market.finalized,
                 "payout_numerator": market.payout_numerator,
                 "categories": categories,
+                "creation_date": U64(ns_to_ms(env::block_timestamp())),
 			}
 		})
 		.to_string()
