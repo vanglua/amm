@@ -400,8 +400,5 @@ fn liquidity_exit_after_swap() {
         deposit = STORAGE_AMOUNT
     );
 
-
-    println!("seed exit res: {:?}", seed_exit_res);
-
     assert!(seed_exit_res.is_ok());
 }
