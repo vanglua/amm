@@ -595,7 +595,6 @@ fn redeem_collat_with_bought_tokens_for_higher_price() {
     redeem_collat_helper(target_price_a, target_price_b, token_value_80_20);
 }
 
-// Should panic but that;s breaking atm
 // #[test]
 // fn redeem_collat_with_bought_tokens_for_lower_price() {
 //     let token_value_80_20 = 3857142857142857142857143;
