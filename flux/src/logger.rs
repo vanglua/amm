@@ -9,6 +9,7 @@ use near_sdk::{
     collections::UnorderedMap
 };
 
+use crate::helper::*;
 use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
@@ -185,6 +186,7 @@ pub fn log_market(
                 "extra_info": extra_info,
                 "outcome_tags": outcome_tags,
                 "end_time": U64(market.end_time),
+                "creation_time": U64(ns_to_ms(env::block_timestamp())),
                 "finalized": market.finalized,
                 "payout_numerator": market.payout_numerator,
                 "categories": categories,
