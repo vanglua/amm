@@ -340,7 +340,7 @@ impl Pool {
         let total_supply = self.pool_token.total_supply();
         let ineligible_fee_amount = match total_supply {
             0 => amount,
-            _ => math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, self.fee_pool_weight, total_supply), amount)
+            _ => math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, self.fee_pool_weight, amount), total_supply)
         };
 
         // On transfer or burn
