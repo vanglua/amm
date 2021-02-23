@@ -355,3 +355,53 @@ fn liquidity_exit_scene() {
         deposit = STORAGE_AMOUNT
     );
 }
+
+
+#[test]
+fn liquidity_exit_after_swap() {
+    let (_master_account, amm, _token, alice, bob, _carol) = init("carol".to_string());
+    let market_id: U64 = create_market(&bob, &amm, 2, Some(swap_fee()));
+
+    assert_eq!(market_id, U64(0));
+
+    let seed_amount = to_yocto("24");
+    let buy_amount = to_yocto("5");
+
+    let weights = Some(vec![U128(50), U128(50)]);
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": weights
+        }
+    }).to_string();
+    ft_transfer_call(&alice, seed_amount, add_liquidity_args.to_string());
+
+    let pool_token_balance: U128 = view!(amm.get_pool_token_balance(market_id, &alice.account_id())).unwrap_json();
+    assert_eq!(pool_token_balance, U128(seed_amount));
+
+    let buy_args = json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": 0,
+            "min_shares_out": U128(0)
+        }
+    }).to_string();
+
+    
+    let buy_res = ft_transfer_call(&alice, buy_amount, buy_args.to_string());
+    
+
+    let seed_exit_res = call!(
+        alice,
+        amm.exit_pool(market_id, pool_token_balance),
+        deposit = STORAGE_AMOUNT
+    );
+
+
+    println!("seed exit res: {:?}", seed_exit_res);
+
+    assert!(seed_exit_res.is_ok());
+}
