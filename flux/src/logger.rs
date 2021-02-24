@@ -150,7 +150,8 @@ pub fn log_user_balance(token: &MintableToken, account_id: &AccountId, new_balan
     env::log(
 		json!({
             "type": "user_balances".to_string(),
-            "cap_id": format!("ub_{}_{}_{}", account_id, token.pool_id, token.outcome_id),
+            "action": "update",
+            "cap_id": format!("ub_{}_{}_{}_{}", account_id, token.pool_id, token.outcome_id, env::block_index()),
 			"params": {
                 "id": format!("ub_{}_{}_{}", account_id, token.pool_id, token.outcome_id),
                 "pool_id": U64(token.pool_id),
@@ -158,6 +159,7 @@ pub fn log_user_balance(token: &MintableToken, account_id: &AccountId, new_balan
                 "account_id": account_id,
                 "balance": U128(new_balance),
                 "block_height": U64(env::block_index()),
+                "creation_date": U64(ns_to_ms(env::block_timestamp())),
 			}
 		})
 		.to_string()
