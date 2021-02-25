@@ -320,7 +320,7 @@ pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) 
             "cap_id": format!("mas_{}_{}", pool.id, account_id),
 			"params": {
                 "id": format!("mas_{}_{}", pool.id, account_id),
-                "market_id": pool.id,
+                "market_id": U64(pool.id),
                 "account_id": account_id,
                 "spent": spent_entries,
                 "resolution_escrow": {
