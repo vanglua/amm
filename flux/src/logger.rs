@@ -289,44 +289,18 @@ pub fn log_withdrawn_fees(pool_token: &MintableToken, account_id: &AccountId, wi
 	);
 }
 
-#[derive(Serialize)]
-struct AccountLogEntries {
-    outcome_id: u16,
-    spent: U128,
-}
-
-pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) {
-    let mut spent_entries: Vec<AccountLogEntries> = vec![];
-
-    for outcome in 0..pool.outcomes {
-        let spent = account_info.entries.get(&outcome);
-
-        match spent {
-            Some(amount_spent) => spent_entries.push(AccountLogEntries {
-                outcome_id: outcome,
-                spent: U128(amount_spent),
-            }),
-            None => spent_entries.push(AccountLogEntries {
-                outcome_id: outcome,
-                spent: U128(0),
-            }),
-        }
-    }
-
+pub fn log_account_outcome_spent(pool: &Pool, account_id: &AccountId, outcome_id: u16, spent: u128) {
     env::log(
 		json!({
-			"type": "market_account_statuses".to_string(),
+			"type": "account_spent".to_string(),
             "action": "update",
-            "cap_id": format!("mas_{}_{}", pool.id, account_id),
+            "cap_id": format!("as_{}_{}_{}", pool.id, account_id, outcome_id),
 			"params": {
-                "id": format!("mas_{}_{}", pool.id, account_id),
+                "id": format!("as_{}_{}", pool.id, account_id),
                 "market_id": U64(pool.id),
                 "account_id": account_id,
-                "spent": spent_entries,
-                "resolution_escrow": {
-                    "valid": U128(account_info.resolution_escrow.valid),
-                    "invalid": U128(account_info.resolution_escrow.invalid)
-                },
+                "outcome_id": outcome_id,
+                "spent": U128(spent),
                 "block_height": U64(env::block_index()),
 			}
 		})
