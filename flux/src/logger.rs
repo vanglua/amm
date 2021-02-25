@@ -44,7 +44,7 @@ pub fn log_pool(pool: &Pool) {
 pub fn log_whitelist(whitelist: &UnorderedMap<AccountId, u32>) {
     env::log(
 		json!({
-            "type": "pools".to_string(),
+            "type": "token_whitelist".to_string(),
             "action": "update",
             "cap_id": "wl",
 			"params": {
