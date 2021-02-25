@@ -292,7 +292,7 @@ pub fn log_withdrawn_fees(pool_token: &MintableToken, account_id: &AccountId, wi
 #[derive(Serialize)]
 struct AccountLogEntries {
     outcome_id: u16,
-    spent: u128,
+    spent: U128,
 }
 
 pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) {
@@ -304,11 +304,11 @@ pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) 
         match spent {
             Some(amount_spent) => spent_entries.push(AccountLogEntries {
                 outcome_id: outcome,
-                spent: amount_spent,
+                spent: U128(amount_spent),
             }),
             None => spent_entries.push(AccountLogEntries {
                 outcome_id: outcome,
-                spent: 0,
+                spent: U128(0),
             }),
         }
     }
@@ -323,7 +323,10 @@ pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) 
                 "market_id": pool.id,
                 "account_id": account_id,
                 "spent": spent_entries,
-                "resolution_escrow": account_info.resolution_escrow,
+                "resolution_escrow": {
+                    "valid": U128(account_info.resolution_escrow.valid),
+                    "invalid": U128(account_info.resolution_escrow.invalid)
+                },
                 "block_height": U64(env::block_index()),
 			}
 		})

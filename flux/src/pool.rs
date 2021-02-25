@@ -23,10 +23,10 @@ use crate::logger;
 
 use crate::outcome_token::MintableFungibleToken;
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize)]
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct ResolutionEscrow {
-    valid: u128,
-    invalid: u128
+    pub valid: u128,
+    pub invalid: u128
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
