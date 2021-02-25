@@ -5,6 +5,9 @@ use near_sdk::{
         U64,
         U128,
     },
+    serde::{
+        Serialize,
+    },
     serde_json::json,
     collections::UnorderedMap
 };
@@ -13,6 +16,7 @@ use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
 use crate::helper::{ ns_to_ms };
+use crate::pool::{ Account };
 
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {
@@ -277,6 +281,49 @@ pub fn log_withdrawn_fees(pool_token: &MintableToken, account_id: &AccountId, wi
                 "outcome_id": pool_token.outcome_id,
                 "account_id": account_id,
                 "withdrawn_amount": U128(withdrawn_amount),
+                "block_height": U64(env::block_index()),
+			}
+		})
+		.to_string()
+		.as_bytes()
+	);
+}
+
+#[derive(Serialize)]
+struct AccountLogEntries {
+    outcome_id: u16,
+    spent: u128,
+}
+
+pub fn log_account(pool: &Pool, account_id: &AccountId, account_info: &Account) {
+    let mut spent_entries: Vec<AccountLogEntries> = vec![];
+
+    for outcome in 0..pool.outcomes {
+        let spent = account_info.entries.get(&outcome);
+
+        match spent {
+            Some(amount_spent) => spent_entries.push(AccountLogEntries {
+                outcome_id: outcome,
+                spent: amount_spent,
+            }),
+            None => spent_entries.push(AccountLogEntries {
+                outcome_id: outcome,
+                spent: 0,
+            }),
+        }
+    }
+
+    env::log(
+		json!({
+			"type": "market_account_statuses".to_string(),
+            "action": "update",
+            "cap_id": format!("mas_{}_{}", pool.id, account_id),
+			"params": {
+                "id": format!("mas_{}_{}", pool.id, account_id),
+                "market_id": pool.id,
+                "account_id": account_id,
+                "spent": spent_entries,
+                "resolution_escrow": account_info.resolution_escrow,
                 "block_height": U64(env::block_index()),
 			}
 		})

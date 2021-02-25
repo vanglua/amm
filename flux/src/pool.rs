@@ -2,6 +2,9 @@ use std::cmp::Ordering;
 use near_sdk::{
     env,
     AccountId,
+    serde::{
+        Serialize,
+    },
     json_types::U128,
     collections::{
         UnorderedMap,
@@ -20,7 +23,7 @@ use crate::logger;
 
 use crate::outcome_token::MintableFungibleToken;
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize)]
 pub struct ResolutionEscrow {
     valid: u128,
     invalid: u128
@@ -33,9 +36,9 @@ pub struct LPEntries {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    entries: LookupMap<u16, u128>, // Stores outcome => spend 
-    lp_entries: LookupMap<u16, u128>,
-    resolution_escrow: ResolutionEscrow
+    pub entries: LookupMap<u16, u128>, // Stores outcome => spend 
+    pub lp_entries: LookupMap<u16, u128>,
+    pub resolution_escrow: ResolutionEscrow
 }
 
 impl Account {
@@ -207,6 +210,7 @@ impl Pool {
         }
 
         self.accounts.insert(sender, &account);
+        logger::log_account(&self, &sender, &account);
     }
 
     pub fn exit_pool(
@@ -244,6 +248,7 @@ impl Pool {
         self.accounts.insert(&sender, &account);
         let fees = self.burn_internal(sender, total_in);
         logger::log_exit_pool(&self, sender, total_in, fees);
+        logger::log_account(&self, &sender, &account);
         fees
     }
 
@@ -292,6 +297,7 @@ impl Pool {
 
         // Store updated account
         self.accounts.insert(sender, &account);
+        logger::log_account(&self, &sender, &account);
 
         in_escrow
     }
@@ -482,6 +488,7 @@ impl Pool {
         self.outcome_tokens.insert(&outcome_target, &token_out);
         self.accounts.insert(sender, &account);
 
+        logger::log_account(&self, &sender, &account);
         logger::log_buy(&self, &sender, outcome_target, amount_in, shares_out, fee);
         logger::log_pool(&self);
     }
@@ -546,6 +553,7 @@ impl Pool {
         self.remove_from_pools(tokens_to_burn);
         self.accounts.insert(&env::predecessor_account_id(), &account);
 
+        logger::log_account(&self, &sender, &account);
         logger::log_sell(&self, &env::current_account_id(), outcome_target, shares_in, amount_out, fee, to_escrow);
 
         to_escrow
