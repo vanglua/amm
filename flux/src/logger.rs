@@ -5,6 +5,9 @@ use near_sdk::{
         U64,
         U128,
     },
+    serde::{
+        Serialize,
+    },
     serde_json::json,
     collections::UnorderedMap
 };
@@ -13,6 +16,7 @@ use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
 use crate::helper::{ ns_to_ms };
+use crate::pool::{ Account };
 
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {
@@ -40,7 +44,7 @@ pub fn log_pool(pool: &Pool) {
 pub fn log_whitelist(whitelist: &UnorderedMap<AccountId, u32>) {
     env::log(
 		json!({
-            "type": "pools".to_string(),
+            "type": "token_whitelist".to_string(),
             "action": "update",
             "cap_id": "wl",
 			"params": {
@@ -277,6 +281,26 @@ pub fn log_withdrawn_fees(pool_token: &MintableToken, account_id: &AccountId, wi
                 "outcome_id": pool_token.outcome_id,
                 "account_id": account_id,
                 "withdrawn_amount": U128(withdrawn_amount),
+                "block_height": U64(env::block_index()),
+			}
+		})
+		.to_string()
+		.as_bytes()
+	);
+}
+
+pub fn log_account_outcome_spent(pool: &Pool, account_id: &AccountId, outcome_id: u16, spent: u128) {
+    env::log(
+		json!({
+			"type": "account_spent".to_string(),
+            "action": "update",
+            "cap_id": format!("as_{}_{}_{}", pool.id, account_id, outcome_id),
+			"params": {
+                "id": format!("as_{}_{}", pool.id, account_id),
+                "market_id": U64(pool.id),
+                "account_id": account_id,
+                "outcome_id": outcome_id,
+                "spent": U128(spent),
                 "block_height": U64(env::block_index()),
 			}
 		})

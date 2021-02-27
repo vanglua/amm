@@ -2,6 +2,9 @@ use std::cmp::Ordering;
 use near_sdk::{
     env,
     AccountId,
+    serde::{
+        Serialize,
+    },
     json_types::U128,
     collections::{
         UnorderedMap,
@@ -22,8 +25,8 @@ use crate::outcome_token::MintableFungibleToken;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct ResolutionEscrow {
-    valid: u128,
-    invalid: u128
+    pub valid: u128,
+    pub invalid: u128
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -33,9 +36,9 @@ pub struct LPEntries {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    entries: LookupMap<u16, u128>, // Stores outcome => spend 
-    lp_entries: LookupMap<u16, u128>,
-    resolution_escrow: ResolutionEscrow
+    pub entries: LookupMap<u16, u128>, // Stores outcome => spend 
+    pub lp_entries: LookupMap<u16, u128>,
+    pub resolution_escrow: ResolutionEscrow
 }
 
 impl Account {
@@ -190,7 +193,10 @@ impl Pool {
             account.lp_entries.insert(&outcome, &(prev_lp_entries + lp_entry_amount));
 
             let prev_spent = account.entries.get(&outcome).unwrap_or(0);
-            account.entries.insert(&outcome, &(prev_spent + spent_on_amount_out));
+            let spent = prev_spent + spent_on_amount_out;
+            account.entries.insert(&outcome, &spent);
+
+            logger::log_account_outcome_spent(&self, &sender, outcome, spent);
 
             let mut outcome_token = self.outcome_tokens
             .get(&(outcome as u16))
@@ -232,8 +238,10 @@ impl Pool {
 
             let account_total_spent_on_outcome = account.lp_entries.get(&outcome).unwrap_or(0);
             let relative_spent = math::mul_u128(self.collateral_denomination, lp_token_exit_ratio, account_total_spent_on_outcome);
-            account.entries.insert(&outcome, &(current_spend + relative_spent));
+            let spent = current_spend + relative_spent;
+            account.entries.insert(&outcome, &spent);
             account.lp_entries.insert(&outcome, &(account_total_spent_on_outcome - relative_spent));
+            logger::log_account_outcome_spent(&self, sender, outcome, spent);
 
 
             let mut token = self.outcome_tokens.get(&outcome).unwrap();
@@ -266,6 +274,7 @@ impl Pool {
             let redeemed_spent = math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, to_burn, user_balance), spent_on_outcome);
             let new_entry_balance = spent_on_outcome - redeemed_spent;
             account.entries.insert(&outcome, &new_entry_balance);
+            logger::log_account_outcome_spent(&self, sender, outcome, new_entry_balance);
 
             // Burn outcome tokens accordingly 
             token.burn(sender, to_burn);
@@ -472,7 +481,9 @@ impl Pool {
         self.fee_pool_weight += fee;
 
         let current_spend_on_outcome = account.entries.get(&outcome_target).unwrap_or(0);
-        account.entries.insert(&outcome_target, &(current_spend_on_outcome + amount_in - fee));
+        let spent = current_spend_on_outcome + amount_in - fee;
+        account.entries.insert(&outcome_target, &spent);
+        logger::log_account_outcome_spent(&self, sender, outcome_target, spent);
 
         let tokens_to_mint = amount_in - fee;
         self.add_to_pools(tokens_to_mint);
@@ -518,7 +529,10 @@ impl Pool {
                 let escrow_amt = math::mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
                 account.resolution_escrow.invalid += escrow_amt;
                 logger::log_to_invalid_escrow(self.id, &sender, account.resolution_escrow.invalid);
-                account.entries.insert(&outcome_target, &(spent - (amount_out + escrow_amt) - fee));
+
+                let new_spent = spent - (amount_out + escrow_amt) - fee;
+                logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
+                account.entries.insert(&outcome_target, &new_spent);
                 0
             },
             Ordering::Greater => {
@@ -530,14 +544,20 @@ impl Pool {
 
                 if entries_to_sub > spent {
                     account.entries.insert(&outcome_target, &0);
+                    logger::log_account_outcome_spent(&self, &sender, outcome_target, 0);
                 } else {
-                    account.entries.insert(&outcome_target, &(spent - entries_to_sub));
+                    let new_spent = spent - entries_to_sub;
+                    account.entries.insert(&outcome_target, &new_spent);
+                    logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 }
 
                 escrow_amt
             },
             Ordering::Equal => {
-                account.entries.insert(&outcome_target, &(spent - amount_out - fee));
+                let new_spent = spent - amount_out - fee;
+
+                account.entries.insert(&outcome_target, &new_spent);
+                logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 0
             }
         };
@@ -557,9 +577,11 @@ impl Pool {
         payout_numerators: &Option<Vec<U128>>
     ) -> u128 {
         let pool_token_balance = self.get_pool_token_balance(account_id);
-        if pool_token_balance > 0 {
-            self.exit_pool(account_id, pool_token_balance);
-        }
+        let fees_earned = if pool_token_balance > 0 { 
+            self.exit_pool(account_id, pool_token_balance) 
+        } else {
+            0
+        };
 
         let balances = self.get_and_clear_balances(account_id);
         let account = match self.accounts.get(account_id) {
@@ -582,7 +604,7 @@ impl Pool {
 
         self.accounts.remove(&account_id);
 
-        payout
+        payout + fees_earned
     }
 
 
