@@ -2,9 +2,6 @@ use std::cmp::Ordering;
 use near_sdk::{
     env,
     AccountId,
-    serde::{
-        Serialize,
-    },
     json_types::U128,
     collections::{
         UnorderedMap,
