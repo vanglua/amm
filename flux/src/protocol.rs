@@ -164,7 +164,6 @@ impl Protocol {
         end_time: U64,
         collateral_token_id: AccountId,
         swap_fee: U128,
-        is_scalar: bool,
     ) -> U64 {
         self.assert_unpaused();
         let end_time: u64 = end_time.into();
@@ -193,7 +192,7 @@ impl Protocol {
             finalized: false
         };
 
-        logger::log_create_market(&market, description, extra_info, outcome_tags, categories, is_scalar);
+        logger::log_create_market(&market, description, extra_info, outcome_tags, categories);
         logger::log_market_status(&market);
         
         self.markets.push(&market);
