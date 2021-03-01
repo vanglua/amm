@@ -5,9 +5,6 @@ use near_sdk::{
         U64,
         U128,
     },
-    serde::{
-        Serialize,
-    },
     serde_json::json,
     collections::UnorderedMap
 };
@@ -16,7 +13,6 @@ use crate::protocol::{ Market };
 use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
 use crate::helper::{ ns_to_ms };
-use crate::pool::{ Account };
 
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {
@@ -180,6 +176,7 @@ pub fn log_create_market(
     extra_info: String,  
     outcome_tags: Vec<String>,
     categories: Vec<String>,
+    is_scalar: bool,
 ) {
 	env::log(
 		json!({
@@ -196,6 +193,7 @@ pub fn log_create_market(
                 "payout_numerator": market.payout_numerator,
                 "categories": categories,
                 "creation_date": U64(ns_to_ms(env::block_timestamp())),
+                "is_scalar": is_scalar,
 			}
 		})
 		.to_string()
