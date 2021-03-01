@@ -567,6 +567,7 @@ impl Pool {
         self.accounts.insert(&env::predecessor_account_id(), &account);
 
         logger::log_sell(&self, &env::current_account_id(), outcome_target, shares_in, amount_out, fee, to_escrow);
+        logger::log_pool(&self);
 
         to_escrow
     }
