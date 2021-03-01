@@ -164,7 +164,7 @@ impl Protocol {
         end_time: U64,
         collateral_token_id: AccountId,
         swap_fee: U128,
-        is_scalar: bool,
+        is_scalar: Option<bool>,
     ) -> U64 {
         self.assert_unpaused();
         let end_time: u64 = end_time.into();
