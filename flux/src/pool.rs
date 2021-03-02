@@ -523,7 +523,7 @@ impl Pool {
         let to_escrow = match (sell_price).cmp(&avg_price) {
             Ordering::Less => {
                 let price_delta = avg_price - sell_price;
-                let escrow_amt = math::complex_mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
+                let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
                 account.resolution_escrow.invalid += escrow_amt;
                 logger::log_to_invalid_escrow(self.id, &sender, account.resolution_escrow.invalid);
 
@@ -534,7 +534,7 @@ impl Pool {
             },
             Ordering::Greater => {
                 let price_delta = sell_price - avg_price;
-                let escrow_amt = math::complex_mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
+                let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
                 account.resolution_escrow.valid += escrow_amt;
                 logger::log_to_valid_escrow(self.id, &sender, account.resolution_escrow.valid);
                 let entries_to_sub = (amount_out - escrow_amt) - fee;
