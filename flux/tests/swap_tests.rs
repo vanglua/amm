@@ -226,7 +226,7 @@ fn swap_complex_buy_test() {
     let inverse_balances: Vec<U128> = vec![post_trade_balances[1], post_trade_balances[2]];
     let product_of_inverse = product_of(&inverse_balances);
 
-    let expected_pool_target_balance = test_utils::math::div_u128(token_denom(), post_trade_invariant, product_of_inverse);
+    let expected_pool_target_balance = test_utils::math::complex_div_u128(token_denom(), post_trade_invariant, product_of_inverse);
     let expected_buyer_target_balance = u128::from(init_balances[0]) + buy_amount - expected_pool_target_balance;
 
     assert_eq!(U128(expected_buyer_target_balance), target_buyer_balance);

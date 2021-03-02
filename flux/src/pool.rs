@@ -133,7 +133,7 @@ impl Pool {
             let max_weight = weights.iter().max().unwrap();
 
             for (i, weight) in weights.iter().enumerate() {
-                let remaining = math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, total_in, *weight), *max_weight);
+                let remaining = math::complex_div_u128(self.collateral_denomination, math::complex_mul_u128(self.collateral_denomination, total_in, *weight), *max_weight);
                 outcome_tokens_to_return.insert(i, total_in - remaining);
             }
 
@@ -146,11 +146,11 @@ impl Pool {
             let pool_supply = self.pool_token.total_supply();
 
             for (i, balance) in pool_balances.iter().enumerate() {
-                let remaining = math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, total_in, *balance), *max_balance); // remaining = amt_in * balance / max_balance
+                let remaining = math::complex_div_u128(self.collateral_denomination, math::complex_mul_u128(self.collateral_denomination, total_in, *balance), *max_balance); // remaining = amt_in * balance / max_balance
                 outcome_tokens_to_return.insert(i, total_in - remaining);
             }
 
-            math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, total_in, pool_supply), *max_balance)
+            math::complex_div_u128(self.collateral_denomination, math::complex_mul_u128(self.collateral_denomination, total_in, pool_supply), *max_balance)
         };
 
         self.mint_and_transfer_outcome_tokens(
@@ -179,7 +179,7 @@ impl Pool {
             // Calculate the amount of money spent by the users on the total minted shares
             let spent_on_outcome = total_in / self.outcomes as u128;
             let spent_on_amount_out = if amount > &0 {
-                math::mul_u128(self.collateral_denomination, spent_on_outcome, math::div_u128(self.collateral_denomination, *amount, total_in))
+                math::complex_mul_u128(self.collateral_denomination, spent_on_outcome, math::complex_div_u128(self.collateral_denomination, *amount, total_in))
             } else {
                 0
             };
@@ -225,16 +225,16 @@ impl Pool {
         assert!(total_in <= sender_pool_token_balance, "ERR_INSUFFICIENT_BALANCE");
 
         let mut account = self.accounts.get(sender).expect("ERR_NO_ACCOUNT");
-        let lp_token_exit_ratio = math::div_u128(self.collateral_denomination, total_in, sender_pool_token_balance);
+        let lp_token_exit_ratio = math::complex_div_u128(self.collateral_denomination, total_in, sender_pool_token_balance);
 
         for (i, balance) in balances.iter().enumerate() {
             let outcome = i as u16;
-            let send_out = math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, total_in, pool_token_supply), *balance);
+            let send_out = math::complex_mul_u128(self.collateral_denomination, math::complex_div_u128(self.collateral_denomination, total_in, pool_token_supply), *balance);
 
             let current_spend = account.entries.get(&outcome).unwrap_or(0);
 
             let account_total_spent_on_outcome = account.lp_entries.get(&outcome).unwrap_or(0);
-            let relative_spent = math::mul_u128(self.collateral_denomination, lp_token_exit_ratio, account_total_spent_on_outcome);
+            let relative_spent = math::complex_mul_u128(self.collateral_denomination, lp_token_exit_ratio, account_total_spent_on_outcome);
             let spent = current_spend + relative_spent;
             account.entries.insert(&outcome, &spent);
             account.lp_entries.insert(&outcome, &(account_total_spent_on_outcome - relative_spent));
@@ -265,10 +265,10 @@ impl Pool {
             let spent_on_outcome = account.entries.get(&outcome).unwrap_or_else(|| panic!("ERR_NO_ENTRIES_{}", outcome));
             let user_balance = token.get_balance(sender);
             assert!(user_balance > 0, "ERR_NO_BALANCE_OUTCOME_{}", outcome);
-            let price_paid_per_share = math::div_u128(self.collateral_denomination, spent_on_outcome, user_balance);
+            let price_paid_per_share = math::complex_div_u128(self.collateral_denomination, spent_on_outcome, user_balance);
 
             // subtract sold off tokens from entries
-            let redeemed_spent = math::mul_u128(self.collateral_denomination, math::div_u128(self.collateral_denomination, to_burn, user_balance), spent_on_outcome);
+            let redeemed_spent = math::complex_mul_u128(self.collateral_denomination, math::complex_div_u128(self.collateral_denomination, to_burn, user_balance), spent_on_outcome);
             let new_entry_balance = spent_on_outcome - redeemed_spent;
             account.entries.insert(&outcome, &new_entry_balance);
             logger::log_account_outcome_spent(&self, sender, outcome, new_entry_balance);
@@ -284,12 +284,12 @@ impl Pool {
         let in_escrow = match avg_price_paid.cmp(&self.collateral_denomination) {
             std::cmp::Ordering::Greater => {
                 let delta = avg_price_paid - self.collateral_denomination;
-                account.resolution_escrow.invalid += math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                account.resolution_escrow.invalid += math::complex_mul_u128(self.collateral_denomination, delta, to_burn) - 1;
                 0
             },
             std::cmp::Ordering::Less => {
                 let delta = self.collateral_denomination - avg_price_paid;
-                let to_escrow = math::mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                let to_escrow = math::complex_mul_u128(self.collateral_denomination, delta, to_burn) - 1;
                 account.resolution_escrow.valid += to_escrow;
                 to_escrow + 1
             }, 
@@ -346,7 +346,7 @@ impl Pool {
         let total_supply = self.pool_token.total_supply();
         let ineligible_fee_amount = match total_supply {
             0 => amount,
-            _ => math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, self.fee_pool_weight, amount), total_supply)
+            _ => math::simple_mul_u128(total_supply, self.fee_pool_weight, amount)
         };
 
         // On transfer or burn
@@ -381,7 +381,7 @@ impl Pool {
     pub fn get_fees_withdrawable(&self, account_id: &AccountId) -> u128 {
         let pool_token_bal = self.pool_token.get_balance(account_id);
         let pool_token_total_supply = self.pool_token.total_supply();
-        let raw_amount = math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
+        let raw_amount = math::complex_div_u128(self.collateral_denomination, math::complex_mul_u128(self.collateral_denomination, self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
         let ineligible_fee_amount = self.withdrawn_fees.get(account_id).unwrap_or(0);
         raw_amount - ineligible_fee_amount
     }
@@ -392,7 +392,7 @@ impl Pool {
     ) -> u128 {
         let pool_token_bal = self.pool_token.get_balance(account_id);
         let pool_token_total_supply = self.pool_token.total_supply();
-        let raw_amount = math::div_u128(self.collateral_denomination, math::mul_u128(self.collateral_denomination, self.fee_pool_weight, pool_token_bal), pool_token_total_supply);
+        let raw_amount = math::simple_mul_u128(pool_token_total_supply, self.fee_pool_weight, pool_token_bal);
         let withdrawn_fees = self.withdrawn_fees.get(account_id).unwrap_or(0);
         let withdrawable_amount = raw_amount - withdrawn_fees;
         if withdrawable_amount > 0 {
@@ -412,7 +412,7 @@ impl Pool {
         assert!(outcome_target <= self.outcomes, "ERR_INVALID_OUTCOME");
 
         let outcome_tokens = &self.outcome_tokens;
-        let collateral_in_minus_fees = collateral_in - math::mul_u128(self.collateral_denomination, collateral_in, self.swap_fee);
+        let collateral_in_minus_fees = collateral_in - math::complex_mul_u128(self.collateral_denomination, collateral_in, self.swap_fee);
         let token_to_buy = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
         let token_to_buy_balance = token_to_buy.get_balance(&env::current_account_id());
         let mut new_buy_token_balance = token_to_buy_balance;
@@ -420,10 +420,10 @@ impl Pool {
         for (outcome, token) in outcome_tokens.iter() {
             if outcome != outcome_target {
                 let balance = token.get_balance(&env::current_account_id());
-                let dividend = math::mul_u128(self.collateral_denomination, new_buy_token_balance, balance);
+                let dividend = math::complex_mul_u128(self.collateral_denomination, new_buy_token_balance, balance);
                 let divisor = balance + collateral_in_minus_fees;
 
-                new_buy_token_balance = math::div_u128(self.collateral_denomination, dividend, divisor);
+                new_buy_token_balance = math::complex_div_u128(self.collateral_denomination, dividend, divisor);
             }
         }
         assert!(new_buy_token_balance > 0, "ERR_MATH_APPROX");
@@ -439,7 +439,7 @@ impl Pool {
         assert!(outcome_target <= self.outcomes, "ERR_INVALID_OUTCOME");
 
         let outcome_tokens = &self.outcome_tokens;
-        let collateral_out_plus_fees = math::div_u128(self.collateral_denomination, collateral_out, self.collateral_denomination - self.swap_fee);
+        let collateral_out_plus_fees = math::complex_div_u128(self.collateral_denomination, collateral_out, self.collateral_denomination - self.swap_fee);
         let token_to_sell = outcome_tokens.get(&outcome_target).expect("ERR_NO_TOKEN");
         let token_to_sell_balance = token_to_sell.get_balance(&env::current_account_id());
         let mut new_sell_token_balance = token_to_sell_balance;
@@ -447,10 +447,10 @@ impl Pool {
         for (outcome, token) in outcome_tokens.iter() {
             if outcome != outcome_target {
                 let balance = token.get_balance(&env::current_account_id());
-                let dividend = math::mul_u128(self.collateral_denomination, new_sell_token_balance, balance);
+                let dividend = math::complex_mul_u128(self.collateral_denomination, new_sell_token_balance, balance);
                 let divisor = balance - collateral_out_plus_fees;
 
-                new_sell_token_balance = math::div_u128(self.collateral_denomination, dividend, divisor);
+                new_sell_token_balance = math::complex_div_u128(self.collateral_denomination, dividend, divisor);
             }
         }
         assert!(new_sell_token_balance > 0, "ERR_MATH_APPROX");
@@ -474,7 +474,7 @@ impl Pool {
         let mut account = self.accounts.get(sender).unwrap_or_else(||{Account::new(self.id, sender)});
 
         // Transfer collateral in
-        let fee = math::mul_u128(self.collateral_denomination, amount_in, self.swap_fee);
+        let fee = math::complex_mul_u128(self.collateral_denomination, amount_in, self.swap_fee);
         self.fee_pool_weight += fee;
 
         let current_spend_on_outcome = account.entries.get(&outcome_target).unwrap_or(0);
@@ -511,9 +511,9 @@ impl Pool {
         let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCE");
         let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
 
-        let fee = math::mul_u128(self.collateral_denomination, amount_out, self.swap_fee);
-        let avg_price = math::div_u128(self.collateral_denomination, spent, token_in.get_balance(sender));
-        let sell_price = math::div_u128(self.collateral_denomination, amount_out + fee, shares_in);
+        let fee = math::complex_mul_u128(self.collateral_denomination, amount_out, self.swap_fee);
+        let avg_price = math::complex_div_u128(self.collateral_denomination, spent, token_in.get_balance(sender));
+        let sell_price = math::complex_div_u128(self.collateral_denomination, amount_out + fee, shares_in);
 
         token_in.transfer(&env::current_account_id(), shares_in);
         self.outcome_tokens.insert(&outcome_target, &token_in);
@@ -523,7 +523,7 @@ impl Pool {
         let to_escrow = match (sell_price).cmp(&avg_price) {
             Ordering::Less => {
                 let price_delta = avg_price - sell_price;
-                let escrow_amt = math::mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
+                let escrow_amt = math::complex_mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
                 account.resolution_escrow.invalid += escrow_amt;
                 logger::log_to_invalid_escrow(self.id, &sender, account.resolution_escrow.invalid);
 
@@ -534,7 +534,7 @@ impl Pool {
             },
             Ordering::Greater => {
                 let price_delta = sell_price - avg_price;
-                let escrow_amt = math::mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
+                let escrow_amt = math::complex_mul_u128(self.collateral_denomination, price_delta, shares_in) - 1;
                 account.resolution_escrow.valid += escrow_amt;
                 logger::log_to_valid_escrow(self.id, &sender, account.resolution_escrow.valid);
                 let entries_to_sub = (amount_out - escrow_amt) - fee;
@@ -590,7 +590,7 @@ impl Pool {
         let payout = if payout_numerators.is_some() {
             payout_numerators.as_ref().unwrap().iter().enumerate().fold(0, |sum, (outcome, num)| {
                 let bal = balances[outcome];
-                let payout = math::mul_u128(self.collateral_denomination, bal, u128::from(*num));
+                let payout = math::complex_mul_u128(self.collateral_denomination, bal, u128::from(*num));
                 sum + payout
             }) + account.resolution_escrow.valid
         } else {
@@ -649,10 +649,10 @@ impl Pool {
             }
         }
 
-        let ratio = math::div_u128(self.collateral_denomination, odds_weight_for_target, odds_weight_sum);
-        let scale = math::div_u128(self.collateral_denomination, self.collateral_denomination, self.collateral_denomination - self.swap_fee);
+        let ratio = math::complex_div_u128(self.collateral_denomination, odds_weight_for_target, odds_weight_sum);
+        let scale = math::complex_div_u128(self.collateral_denomination, self.collateral_denomination, self.collateral_denomination - self.swap_fee);
 
-        math::mul_u128(self.collateral_denomination, ratio, scale)
+        math::complex_mul_u128(self.collateral_denomination, ratio, scale)
     }
 
     // Should be done in data layer
@@ -677,7 +677,7 @@ impl Pool {
             return 0
         }
 
-        math::div_u128(self.collateral_denomination, odds_weight_for_target, odds_weight_sum)
+        math::complex_div_u128(self.collateral_denomination, odds_weight_for_target, odds_weight_sum)
     }
 
     fn get_odds_weight_for_outcome(
@@ -692,7 +692,7 @@ impl Pool {
                 odds_weight_for_target = if odds_weight_for_target == 0 {
                     balance
                 } else {
-                    math::mul_u128(self.collateral_denomination, odds_weight_for_target, balance)
+                    math::complex_mul_u128(self.collateral_denomination, odds_weight_for_target, balance)
                 };
             }
         }

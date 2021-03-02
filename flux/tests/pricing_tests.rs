@@ -101,18 +101,18 @@ fn pricing_multi_outcome_pool_test() {
     }).to_string();
     ft_transfer_call(&alice, seed_amount, add_liquidity_args);
 
-    let bal_0 = test_utils::math::mul_u128(token_denom(), twenty, collat);
-    let bal_1 = test_utils::math::mul_u128(token_denom(), twenty, collat);
-    let bal_2 = test_utils::math::mul_u128(token_denom(), sixty, collat);
+    let bal_0 = test_utils::math::complex_mul_u128(token_denom(), twenty, collat);
+    let bal_1 = test_utils::math::complex_mul_u128(token_denom(), twenty, collat);
+    let bal_2 = test_utils::math::complex_mul_u128(token_denom(), sixty, collat);
 
-    let odds_weight_0 = test_utils::math::mul_u128(token_denom(), bal_1, bal_2);
-    let odds_weight_1 = test_utils::math::mul_u128(token_denom(), bal_0, bal_2);
-    let odds_weight_2 = test_utils::math::mul_u128(token_denom(), bal_0, bal_1);
+    let odds_weight_0 = test_utils::math::complex_mul_u128(token_denom(), bal_1, bal_2);
+    let odds_weight_1 = test_utils::math::complex_mul_u128(token_denom(), bal_0, bal_2);
+    let odds_weight_2 = test_utils::math::complex_mul_u128(token_denom(), bal_0, bal_1);
     let odds_weight_sum = odds_weight_0 + odds_weight_1 + odds_weight_2;
 
-    let expected_mp_0 = test_utils::math::div_u128(token_denom(), odds_weight_0, odds_weight_sum);
-    let expected_mp_1 = test_utils::math::div_u128(token_denom(), odds_weight_1, odds_weight_sum);
-    let expected_mp_2 = test_utils::math::div_u128(token_denom(), odds_weight_2, odds_weight_sum);
+    let expected_mp_0 = test_utils::math::complex_div_u128(token_denom(), odds_weight_0, odds_weight_sum);
+    let expected_mp_1 = test_utils::math::complex_div_u128(token_denom(), odds_weight_1, odds_weight_sum);
+    let expected_mp_2 = test_utils::math::complex_div_u128(token_denom(), odds_weight_2, odds_weight_sum);
 
     let wrapped_price_0: U128 = view!(amm.get_spot_price_sans_fee(market_id, 0)).unwrap_json();
     let wrapped_price_1: U128 = view!(amm.get_spot_price_sans_fee(market_id, 1)).unwrap_json();
@@ -158,8 +158,8 @@ fn pricing_fee_test_calc() {
     let even_price: u128 = even_price_wrapped.into();
     let swap_fee: u128 = swap_fee_wrapped.into();
 
-    let scale = test_utils::math::div_u128(token_denom(), to_token_denom(1), to_token_denom(1) - swap_fee);
-    let half_plus_fee = test_utils::math::mul_u128( token_denom(), half, scale);
+    let scale = test_utils::math::complex_div_u128(token_denom(), to_token_denom(1), to_token_denom(1) - swap_fee);
+    let half_plus_fee = test_utils::math::complex_mul_u128( token_denom(), half, scale);
 
     assert_eq!(even_price, half_plus_fee);
 

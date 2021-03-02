@@ -230,6 +230,8 @@ fn fee_invalid_market_lp_fee_test() {
         deposit = STORAGE_AMOUNT
     );
     assert!(lp_claim_res.is_ok());
+
+    let amm_bal = ft_balance_of(&funder, &"amm".to_string());
     
     let trader_claim_res = call!(
         trader,
@@ -246,8 +248,8 @@ fn fee_invalid_market_lp_fee_test() {
     let amm_final_balance: u128 = ft_balance_of(&funder, &"amm".to_string()).into();
     
     // Assert balances
-    let expected_lp_final_balance = funder_balance + u128::from(claimable_by_funder);
-    let expected_joiner_final_balance = joiner_trader_balances;
+    let expected_lp_final_balance = funder_balance + u128::from(claimable_by_funder) - 1;
+    let expected_joiner_final_balance = joiner_trader_balances + 1;
     let expected_trader_final_balance = joiner_trader_balances - u128::from(claimable_by_funder);
 
     assert_eq!(lp_final_balance, expected_lp_final_balance);

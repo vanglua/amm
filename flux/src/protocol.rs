@@ -97,6 +97,16 @@ impl Protocol {
         U128(market.pool.get_swap_fee())
     }
 
+    pub fn get_fee_pool_weight(&self, market_id: U64) -> U128 {
+        let market = self.get_market_expect(market_id);
+        U128(market.pool.fee_pool_weight)
+    }
+
+    pub fn get_pool_token_total_supply(&self, market_id: U64) -> U128 {
+        let market = self.get_market_expect(market_id);
+        U128(market.pool.pool_token.total_supply())
+    }
+
     pub fn get_token_whitelist(&self) -> Vec<(AccountId, u32)> {
         self.token_whitelist.to_vec()
     }

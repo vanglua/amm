@@ -225,7 +225,7 @@ pub fn fee() -> U128 {
 pub fn create_market(creator: &UserAccount, amm: &ContractAccount<ProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
     call!(
         creator,
-        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee())),
+        amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee()), None),
         deposit = STORAGE_AMOUNT
     ).unwrap_json()
 }
@@ -242,7 +242,7 @@ pub fn product_of(nums: &Vec<U128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
     nums.iter().fold(token_denom(), |prod, &num| {
         let num_u128: u128 = num.into();
-        math::mul_u128(token_denom(), prod, num_u128)
+        math::complex_mul_u128(token_denom(), prod, num_u128)
     })
 }
 
@@ -250,7 +250,7 @@ pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
     let product = product_of(&prices);
     
     prices.iter().map(|price| {
-       U128(math::div_u128(token_denom(), u128::from(product), u128::from(*price)))
+       U128(math::complex_div_u128(token_denom(), u128::from(product), u128::from(*price)))
     }).collect()
 }
 

@@ -235,7 +235,7 @@ fn payout_lp_no_exit() {
         // Get initial balances
         let lp_init_balance: u128 = init_balance();
         let buy_amount = to_yocto("10");
-        let fees = math::mul_u128(token_denom(), buy_amount, swap_fee().into());
+        let fees = math::complex_mul_u128(token_denom(), buy_amount, swap_fee().into());
         
         // Calc expected balances after invalid resolution
         // Expect bob to have init_bal - fees
