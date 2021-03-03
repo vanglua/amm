@@ -1,12 +1,11 @@
-mod test_utils;
-use test_utils::*;
+use crate::test_utils::*;
 use near_sdk::json_types::{U64, U128};
 use near_sdk::serde_json::json;
 use near_sdk_sim::{to_yocto, call, view, STORAGE_AMOUNT};
 
 #[test]
 fn fee_valid_market_lp_fee_test() {
-    let (_master_account, amm, token, funder, joiner, trader) = test_utils::init("carol".to_string());
+    let (_master_account, amm, token, funder, joiner, trader) = crate::test_utils::init("carol".to_string());
 
     let joiner_trader_balances = init_balance();
     let funder_balance = init_balance();
@@ -100,7 +99,7 @@ fn fee_valid_market_lp_fee_test() {
 
 #[test]
 fn fee_invalid_market_lp_fee_test() {
-    let (master_account, amm, token, funder, joiner, trader) = test_utils::init("carol".to_string());
+    let (master_account, amm, token, funder, joiner, trader) = crate::test_utils::init("carol".to_string());
 
     let joiner_trader_balances = init_balance();
 
