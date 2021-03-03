@@ -8,10 +8,10 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs.git", tag="2.4.0" }
+near-sdk = { git = "https://github.com/near/near-sdk-rs.git", tag="contract_cache_v0" }
 
 [dev-dependencies]
-near-sdk-sim = { git = "https://github.com/near/near-sdk-rs.git", tag="2.4.0" }
+near-sdk-sim = { git = "https://github.com/near/near-sdk-rs.git", tag="contract_cache_v0" }
 
 [profile.release]
 codegen-units=1
