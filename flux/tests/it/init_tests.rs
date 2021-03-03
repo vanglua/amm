@@ -1,7 +1,7 @@
 use near_sdk_sim::to_yocto;
 use near_sdk::json_types::U128;
-mod test_utils;
-use test_utils::*;
+use crate::test_utils::*;
+
 #[test]
 fn test_near_wrap() {
     let (master_account, amm, token, alice, bob, carol) = init("carol".to_string());

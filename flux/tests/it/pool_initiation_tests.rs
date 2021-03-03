@@ -1,5 +1,4 @@
-mod test_utils;
-use test_utils::*;
+use crate::test_utils::*;
 use near_sdk::json_types::{U64, U128};
 use near_sdk::serde_json::json;
 use near_sdk_sim::{to_yocto, view};
