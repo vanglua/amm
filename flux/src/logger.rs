@@ -14,6 +14,35 @@ use crate::pool::{ Pool };
 use crate::outcome_token::{ MintableToken };
 use crate::helper::{ ns_to_ms };
 
+#[derive(serde::Serialize)]
+pub enum TransactionType {
+    Buy,
+    Sell,
+    Redeem,
+    ClaimEarnings,
+    AddLiquidity,
+    RemoveLiquidity,
+}
+
+pub fn log_transaction(tx_type: &TransactionType, account_id: &AccountId, input: u128, output: u128, market_id: U64, outcome_id: Option<u16>) {
+    env::log(
+        json!({
+            "type": "transactions",
+            "params": {
+                "account_id": account_id,
+                "input": U128(input),
+                "output": U128(output),
+                "market_id": market_id,
+                "outcome_id": outcome_id.unwrap_or(0),
+                "date": U64(ns_to_ms(env::block_timestamp())),
+                "type": tx_type,
+            }
+        })
+        .to_string()
+        .as_bytes()
+    );
+}
+
 // NEW_POOL env log
 pub fn log_pool(pool: &Pool) {
 	env::log(
@@ -91,6 +120,7 @@ pub fn log_user_pool_status(pool: &Pool, account_id: &AccountId, total_in: u128)
 
 
 pub fn log_exit_pool(pool: &Pool, account_id: &AccountId, pool_tokens_in: u128, fees_earned: u128) {
+    log_transaction(&TransactionType::RemoveLiquidity, account_id, pool_tokens_in, fees_earned, U64(pool.id), None);
     env::log(
 		json!({
 			"type": "pool_exits".to_string(),
@@ -140,10 +170,12 @@ fn log_swap(pool: &Pool, account_id: &AccountId, outcome: u16, input: u128, outp
 
 pub fn log_buy(pool: &Pool, account_id: &AccountId, outcome: u16, amount_in: u128, shares_out: u128, fee: u128) {
     log_swap(pool, account_id, outcome, amount_in, shares_out, fee, &SwapType::Buy);
+    log_transaction(&TransactionType::Buy, account_id, amount_in, shares_out, U64(pool.id), Some(outcome));
 }
 
 pub fn log_sell(pool: &Pool, account_id: &AccountId, outcome: u16, shares_in: u128, amount_out: u128, fee: u128, to_escrow: u128) {
     log_swap(pool, account_id, outcome, shares_in, amount_out - to_escrow, fee, &SwapType::Sell);
+    log_transaction(&TransactionType::Sell, account_id, shares_in, amount_out - to_escrow, U64(pool.id), Some(outcome));
 }
 
 pub fn log_user_balance(token: &MintableToken, account_id: &AccountId, new_balance: u128) {
@@ -255,6 +287,7 @@ pub fn log_claim_earnings(
     claimer: AccountId,
     payout: u128
 ) {
+    log_transaction(&TransactionType::ClaimEarnings, &claimer, 0, payout, market_id, None);
     env::log(
 		json!({
 			"type": "claims".to_string(),

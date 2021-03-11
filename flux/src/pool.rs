@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 use near_sdk::{
     env,
     AccountId,
-    json_types::U128,
+    json_types::{
+        U128,
+        U64,
+    },
     collections::{
         UnorderedMap,
         LookupMap
@@ -162,6 +165,7 @@ impl Pool {
         self.mint_internal(sender, to_mint);
 
         logger::log_pool(&self);
+        logger::log_transaction(&logger::TransactionType::AddLiquidity, &sender, total_in, to_mint, U64(self.id), None);
         logger::log_user_pool_status(&self, &env::predecessor_account_id(), total_in);
     }
 
