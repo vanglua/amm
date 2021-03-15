@@ -437,6 +437,9 @@ impl Protocol {
         self.refund_storage(initial_storage, env::predecessor_account_id());
 
         let payout = u128::from(to_burn) - escrowed;
+
+        logger::log_transaction(&logger::TransactionType::Redeem, &env::predecessor_account_id(), to_burn.into(), payout, market_id, None);
+
         collateral_token::ft_transfer(
             env::predecessor_account_id(),
             payout.into(),
