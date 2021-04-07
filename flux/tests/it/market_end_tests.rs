@@ -117,7 +117,6 @@ fn test_valid_market_payout() {
     assert_eq!(second_claim_balance, expected_second_claim_balance, "unexpected payout");
 }
 
-
 #[test]
 fn test_invalid_market_payout() {
         // Get accounts
@@ -145,7 +144,6 @@ fn test_invalid_market_payout() {
         // Create market
         let market_id = create_market(&lp, &amm, 2, Some(U128(0)));
         
-
         let add_liquidity_args = json!({
             "function": "add_liquidity",
             "args": {
@@ -214,6 +212,7 @@ fn test_invalid_market_payout() {
             amm.claim_earnings(market_id),
             deposit = STORAGE_AMOUNT
         );
+
 
         // Get updated balances
         let lp_final_balance: u128 = ft_balance_of(&master_account, &lp.account_id()).into();

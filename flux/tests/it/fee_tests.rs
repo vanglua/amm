@@ -257,3 +257,108 @@ fn fee_invalid_market_lp_fee_test() {
     assert_eq!(amm_final_balance, 0);
 }
 
+
+fn buy_args(market_id: U64, outcome: u8, min_shares_out: U128) -> String {
+    json!({
+        "function": "buy",
+        "args": {
+            "market_id": market_id,
+            "outcome_target": outcome,
+            "min_shares_out": min_shares_out
+        }
+    }).to_string()
+}
+
+#[test]
+fn test_specific_fee_scenario() {
+    let (_master_account, amm, _token, trader1, trader2, seeder) = crate::test_utils::init("carol".to_string());
+
+    let seeder_balance: u128 = ft_balance_of(&seeder, &seeder.account_id()).into();
+    let trader1_balance: u128 = ft_balance_of(&trader1, &trader1.account_id()).into();
+    let trader2_balance: u128 = ft_balance_of(&trader2, &trader2.account_id()).into();
+
+    let fee_payed_t1 = to_token_denom(2) / 100 + to_token_denom(117) * 2 / 10000;
+    let fee_payed_t2 = to_token_denom(6) / 100;
+
+    let expected_trader1_balance = trader1_balance - fee_payed_t1;
+    let expected_trader2_balance = trader2_balance - fee_payed_t2;
+    let expected_seeder_balance = seeder_balance + fee_payed_t1 + fee_payed_t2;
+
+    let seed_amount = to_token_denom(10);
+    let buy_amt_t1 = to_token_denom(1);
+    let buy_amt_t2 = to_token_denom(3);
+
+    let target_price_a = U128(to_token_denom(5) / 10);
+    let target_price_b = U128(to_token_denom(5) / 10);
+    let weights = calc_weights_from_price(vec![target_price_a, target_price_b]);
+
+    let swap_fee = to_token_denom(2) / 100;
+
+    let market_id: U64 = create_market(&seeder, &amm, 2, Some(U128(swap_fee)));
+
+    assert_eq!(market_id, U64(0));
+
+    let add_liquidity_args = json!({
+        "function": "add_liquidity",
+        "args": {
+            "market_id": market_id,
+            "weight_indication": Some(weights)
+        }
+    }).to_string();
+
+    ft_transfer_call(&seeder, seed_amount, add_liquidity_args);
+
+    ft_transfer_call(&trader1, buy_amt_t1, buy_args(market_id, 0, U128(0)));
+    ft_transfer_call(&trader2, buy_amt_t2, buy_args(market_id, 0, U128(0)));
+
+    let sell_res_trader1 = call!(
+        trader1,
+        amm.sell(market_id, U128(to_token_denom(117) / 100), 0, U128(to_token_denom(10000))),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(sell_res_trader1.is_ok());
+
+    // Resolute market
+    let resolute_market = call!(
+        seeder,
+        amm.resolute_market(market_id, None),
+        deposit = STORAGE_AMOUNT
+    );
+
+    assert!(resolute_market.is_ok());
+
+    // Claim earnings
+    let claim_res_t1 = call!(
+        trader1,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(claim_res_t1.is_ok());
+    
+    // Claim earnings
+    let claim_res_t2 = call!(
+        trader2,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+    assert!(claim_res_t2.is_ok());
+    
+    // Claim earnings
+    let claim_res_seeder = call!(
+        seeder,
+        amm.claim_earnings(market_id),
+        deposit = STORAGE_AMOUNT
+    );
+
+    assert!(claim_res_seeder.is_ok());
+    let amm_bal: u128 = ft_balance_of(&seeder, &"amm".to_string()).into();
+
+    let seeder_balance_post: u128 = ft_balance_of(&seeder, &seeder.account_id()).into();
+    let trader1_balance_post: u128 = ft_balance_of(&trader1, &trader1.account_id()).into();
+    let trader2_balance_post: u128 = ft_balance_of(&trader2, &trader2.account_id()).into();
+
+    assert_eq!(amm_bal, 0);
+    assert_eq!(trader1_balance_post, expected_trader1_balance);
+    assert_eq!(trader2_balance_post, expected_trader2_balance);
+    assert_eq!(seeder_balance_post, expected_seeder_balance);
+}

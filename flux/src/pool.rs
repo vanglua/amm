@@ -530,7 +530,7 @@ impl Pool {
                 let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
                 account.resolution_escrow.invalid += escrow_amt;
                 logger::log_to_invalid_escrow(self.id, &sender, account.resolution_escrow.invalid);
-
+                
                 let new_spent = spent - (amount_out + escrow_amt) - fee;
                 logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 account.entries.insert(&outcome_target, &new_spent);
@@ -541,7 +541,7 @@ impl Pool {
                 let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
                 account.resolution_escrow.valid += escrow_amt;
                 logger::log_to_valid_escrow(self.id, &sender, account.resolution_escrow.valid);
-                let entries_to_sub = (amount_out - escrow_amt) - fee;
+                let entries_to_sub = amount_out - escrow_amt + fee;
 
                 if entries_to_sub > spent {
                     account.entries.insert(&outcome_target, &0);
