@@ -107,7 +107,7 @@ pub fn log_user_pool_status(pool: &Pool, account_id: &AccountId, total_in: u128)
             "action": "update",
 			"params": {
                 "id": format!("ups_{}_{}", account_id, pool.id),
-                "pool_id": pool.id,
+                "pool_id": U64(pool.id),
                 "account_id": account_id,
                 "total_in": U128(total_in),
                 "block_height": U64(env::block_index()),
@@ -125,7 +125,7 @@ pub fn log_exit_pool(pool: &Pool, account_id: &AccountId, pool_tokens_in: u128, 
 		json!({
 			"type": "pool_exits".to_string(),
 			"params": {
-                "pool_id": pool.id,
+                "pool_id": U64(pool.id),
                 "account_id": account_id,
                 "pool_tokens_in": U128(pool_tokens_in),
                 "block_height": U64(env::block_index()),
