@@ -20,8 +20,8 @@ fn multi_lp_payout_no_exit() {
         let expected_amm_final_balance = 0;
         
         // Seed / trade parameters
-        let target_price_0 = U128(to_token_denom(95) / 100);
-        let target_price_1 = U128(to_token_denom(5) / 100);
+        let target_price_0 = U128(to_token_denom(9999) / 10000);
+        let target_price_1 = U128(to_token_denom(1) / 100);
         let seed_amount_0 = 200000000000000000000000 ;
         let seed_amount_1 = to_token_denom(1) ;
         let weights = calc_weights_from_price(vec![target_price_1, target_price_0]);
