@@ -35,10 +35,10 @@ const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {
-    pub end_time: u64,
-    pub pool: Pool,
-    pub payout_numerator: Option<Vec<U128>>,
-    pub finalized: bool,
+    pub end_time: u64, // Time when trading is halted and the market can be resoluted
+    pub pool: Pool, // Implementation that manages the liquidity pool and swap
+    pub payout_numerator: Option<Vec<U128>>, // Optional Vector that dictates how payout is done. Each payout numerator index corresponds to an outcome and shares the denomination of te collateral token for this market.
+    pub finalized: bool, // If true the market has an outcome, if false the market it still undecided.
 }
 
 #[ext_contract]
@@ -50,16 +50,16 @@ pub trait CollateralToken {
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
-    markets: Vector<Market>,
-    token_whitelist: UnorderedMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in TODO: change to iterable or hashmap
-    paused: bool
+    markets: Vector<Market>, // Vector containing all markets where the index represents the market id
+    token_whitelist: UnorderedMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in
+    paused: bool // If true certain functions are no longer callable, settable by `gov`
 }
 
 #[near_bindgen]
 impl Protocol {
     /**
-     * @notice Initialize the contract by setting the
-     * @param gov is the account_id of the account with governance privilages
+     * @notice Initialize the contract by setting global contract attributes
+     * @param gov is the `AccountId` of the account with governance privilages
      * @param token_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
@@ -72,6 +72,7 @@ impl Protocol {
         assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
         let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
+        // Combine `tokens` (key) and `decimals` (value) into an `UnorderedMap`
         for (i, id) in tokens.into_iter().enumerate() {
             let decimal = decimals[i];
             let account_id: AccountId = id.into();
@@ -88,29 +89,51 @@ impl Protocol {
         }
     }
 
+    /**
+     * @returns the current governance `AccountId`
+     */
     pub fn gov(&self) -> AccountId {
         self.gov.to_string()
     }
 
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @returns the fee percentage denominated in 1e4 e.g. 1 = 0.01%
+     */
     pub fn get_pool_swap_fee(&self, market_id: U64) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.get_swap_fee())
     }
 
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @returns the `fee_pool_weight` which dictates fee payouts
+     */
     pub fn get_fee_pool_weight(&self, market_id: U64) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.fee_pool_weight)
     }
 
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @returns the LP token's total supply for a pool
+     */
     pub fn get_pool_token_total_supply(&self, market_id: U64) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.pool_token.total_supply())
     }
 
+    /**
+     * @returns the whitelisted collateral tokens
+     */
     pub fn get_token_whitelist(&self) -> Vec<(AccountId, u32)> {
         self.token_whitelist.to_vec()
     }
 
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @returns all of the outcome balances for a specific pool
+     */
     pub fn get_pool_balances(
         &self,
         market_id: U64
@@ -119,9 +142,18 @@ impl Protocol {
         market.pool.get_pool_balances().into_iter().map(|b| b.into()).collect()
     }
 
-    pub fn get_pool_token_balance(&self, market_id: U64, owner_id: &AccountId) -> U128 {
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @param account_id the `AccountId` to retrieve data from
+     * @returns the LP token balance for `account_id`
+     */
+    pub fn get_pool_token_balance(
+        &self, 
+        market_id: U64, 
+        account_id: &AccountId
+    ) -> U128 {
         let market = self.get_market_expect(market_id);
-        U128(market.pool.get_pool_token_balance(owner_id))
+        U128(market.pool.get_pool_token_balance(account_id))
     }
 
     pub fn get_spot_price_sans_fee(
@@ -177,6 +209,7 @@ impl Protocol {
         is_scalar: Option<bool>,
     ) -> U64 {
         self.assert_unpaused();
+        assert!(env::predecessor_account_id() == "counselor.near" || env::predecessor_account_id() == "fluxdao.near", "only Flux DAO members can create markets at this point in time");
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.markets.len();
