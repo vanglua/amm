@@ -1,4 +1,4 @@
-target/
+/target/
 res/
 .DS_STORE
-flux/target/contract_cache/
+/flux/target
