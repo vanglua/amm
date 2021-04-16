@@ -150,12 +150,18 @@ impl Protocol {
     pub fn get_pool_token_balance(
         &self, 
         market_id: U64, 
-        account_id: &AccountId
+        owner_id: &AccountId
     ) -> U128 {
         let market = self.get_market_expect(market_id);
-        U128(market.pool.get_pool_token_balance(account_id))
+        U128(market.pool.get_pool_token_balance(owner_id))
     }
 
+    /**
+     * @notice returns the current spot price of an outcome without taking a fee into account
+     * @param market_id is the index of the market to retrieve data from
+     * @param outcome is the outcome to get the current spot price fpr
+     * @returns a wrapped price of the outcome at current state
+     */
     pub fn get_spot_price_sans_fee(
         &self,
         market_id: U64,
@@ -165,6 +171,13 @@ impl Protocol {
         market.pool.get_spot_price_sans_fee(outcome).into()
     }
 
+    /**
+     * @notice calculates the amount of shares of a certain outcome a user would get out for the collateral they provided
+     * @param market_id is the index of the market to retrieve data from
+     * @param collateral_in is the amount of collateral to be used to calculate amount of shares out
+     * @param collateral_in is the amount of collateral to be used to calculate amount of shares out
+     * @returns a wrapped number of `outcome_shares` a user would get in return for `collateral_in`
+     */
     pub fn calc_buy_amount(
         &self,
         market_id: U64,
