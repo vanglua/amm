@@ -23,6 +23,8 @@ use near_sdk::{
     },
 };
 
+// TODO: use json_string -> struct parsing consistent with oracle
+
 use crate::helper::*;
 
 use crate::pool::Pool;
@@ -175,7 +177,7 @@ impl Protocol {
      * @notice calculates the amount of shares of a certain outcome a user would get out for the collateral they provided
      * @param market_id is the index of the market to retrieve data from
      * @param collateral_in is the amount of collateral to be used to calculate amount of shares out
-     * @param collateral_in is the amount of collateral to be used to calculate amount of shares out
+     * @param outcome_target is the outcome that is to be purchased 
      * @returns a wrapped number of `outcome_shares` a user would get in return for `collateral_in`
      */
     pub fn calc_buy_amount(
@@ -188,6 +190,14 @@ impl Protocol {
         U128(market.pool.calc_buy_amount(collateral_in.into(), outcome_target))
     }
 
+    /**
+     * TODO: Rename to calc_sell_shares_in
+     * @notice calculates the amount of shares a user has to put in in order to get `collateral_out`
+     * @param market_id is the index of the market to retrieve data from
+     * @param collateral_out is the amount of collateral that a user wants to get out of a position, it's used to calculate the amount of `outcome_shares` that need to be transferred in
+     * @param outcome_target is the outcome that the amount of shares a user wants to sell
+     * @returns a wrapped number of `outcome_shares` a user would have to transfer in in order to get `collateral_out`
+     */
     pub fn calc_sell_collateral_out(
         &self,
         market_id: U64,
@@ -198,16 +208,49 @@ impl Protocol {
         U128(market.pool.calc_sell_collateral_out(collateral_out.into(), outcome_target))
     }
 
-    pub fn get_share_balance(&self, account_id: &AccountId, market_id: U64, outcome: u16) -> U128 {
+    /**
+     * @param account_id is the `AccountId` to retrieve the `outcome_shares` for
+     * @param market_id is the index of the market to retrieve data from
+     * @param outcome is the `outcome_shares` to get the balance from
+     * @returns wrapped balance of `outcome_shares`
+     */
+    pub fn get_share_balance(
+        &self, 
+        account_id: &AccountId, 
+        market_id: U64, 
+        outcome: u16
+    ) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.get_share_balance(account_id, outcome))
     }
 
-    pub fn get_fees_withdrawable(&self, market_id: U64, account_id: &AccountId) -> U128 {
+    /**
+     * @param market_id is the index of the market to retrieve data from
+     * @param account_id is the account id to retrieve the accrued fees for
+     * @returns wrapped amount of fees withdrawable for `account_id`
+     */
+    pub fn get_fees_withdrawable(
+        &self, 
+        market_id: U64, 
+        account_id: &AccountId
+    ) -> U128 {
         let market = self.get_market_expect(market_id);
         U128(market.pool.get_fees_withdrawable(account_id))
     }
 
+    /**
+     * @notice allows users to create new markets
+     * @param description is a detailed description of the market
+     * @param extra_info extra information on how the market should be resoluted
+     * @param outcomes the number of possible outcomes for the market
+     * @param outcome_tags is a list of outcomes where the index is the `outcome_id`
+     * @param categories is a list of categories to filter the market by
+     * @param end_time when the trading should stop and the market can be resolved
+     * @param collateral_token_id the `account_id` of the whitelisted token that is used as collateral for trading
+     * @param swap_fee the fee that's taken from every swap and paid out to LPs
+     * @param is_scalar if the market is a scalar market (range)
+     * @returns wrapped `market_id` 
+     */
     #[payable]
     pub fn create_market(
         &mut self,
@@ -257,6 +300,95 @@ impl Protocol {
         market_id.into()
     }
 
+    /**
+     * @notice sell `outcome_shares` for collateral
+     * @param market_id references the market to sell shares from 
+     * @param collateral_out is the amount of collateral that is expected to be transferred to the sender after selling
+     * @param outcome_target is which `outcome_share` to sell
+     * @param max_shares_in is the maximum amount of `outcome_shares` to transfer in, in return for `collateral_out` this is prevent sandwich attacks and unwanted `slippage`
+     * @returns a promise referencing the collateral token transaction
+     */
+    #[payable]
+    pub fn sell(
+        &mut self,
+        market_id: U64,
+        collateral_out: U128,
+        outcome_target: u16,
+        max_shares_in: U128
+    ) -> Promise {
+        self.assert_unpaused();
+        let initial_storage = env::storage_usage();
+        let collateral_out: u128 = collateral_out.into();
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        let escrowed = market.pool.sell(
+            &env::predecessor_account_id(),
+            collateral_out,
+            outcome_target,
+            max_shares_in.into()
+        );
+
+        self.markets.replace(market_id.into(), &market);
+        self.refund_storage(initial_storage, env::predecessor_account_id());
+
+        collateral_token::ft_transfer(
+            env::predecessor_account_id(), 
+            U128(collateral_out - escrowed),
+            None,
+            &market.pool.collateral_token_id,
+            1,
+            GAS_BASE_COMPUTE
+        )
+    }
+
+    /**
+     * @notice Allows senders who hold tokens in all outcomes to redeem the lowest common denominator of shares for an equal amount of collateral
+     * @param market_id references the market to redeem
+     * @param total_in is the amount outcome tokens to redeem
+     * @returns a transfer `Promise` or a boolean representing a collateral transfer
+     */
+    #[payable]
+    pub fn burn_outcome_tokens_redeem_collateral(
+        &mut self,
+        market_id: U64,
+        to_burn: U128
+    ) -> Promise {
+        self.assert_unpaused();
+        let initial_storage = env::storage_usage();
+
+        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
+        assert!(!market.finalized, "ERR_MARKET_FINALIZED");
+
+        let escrowed = market.pool.burn_outcome_tokens_redeem_collateral(
+            &env::predecessor_account_id(),
+            to_burn.into()
+        );
+
+        self.markets.replace(market_id.into(), &market);
+
+        self.refund_storage(initial_storage, env::predecessor_account_id());
+
+        let payout = u128::from(to_burn) - escrowed;
+
+        logger::log_transaction(&logger::TransactionType::Redeem, &env::predecessor_account_id(), to_burn.into(), payout, market_id, None);
+
+        collateral_token::ft_transfer(
+            env::predecessor_account_id(),
+            payout.into(),
+            None,
+            &market.pool.collateral_token_id,
+            1,
+            GAS_BASE_COMPUTE
+        )
+    }
+
+    /**
+     * @notice removes liquidity from a pool
+     * @param market_id references the market to remove liquidity from 
+     * @param total_in is the amount of LP tokens to redeem
+     * @returns a transfer `Promise` or a boolean representing a successful exit
+     */
     #[payable]
     pub fn exit_pool(
         &mut self,
@@ -292,40 +424,44 @@ impl Protocol {
         }
     }
 
+    /**
+     * @notice sets the resolution and finalizes a market
+     * @param market_id references the market to resolute 
+     * @param payout_numerator optional list of numeric values that represent the relative payout value for owners of matching outcome shares
+     *      share denomination with collateral token. E.g. Collateral token denomination is 1e18 means that if payout_numerators are [5e17, 5e17] 
+     *      it's a 50/50 split if the payout_numerator is None it means that the market is invalid
+     */
     #[payable]
-    pub fn sell(
+    pub fn resolute_market(
         &mut self,
         market_id: U64,
-        collateral_out: U128,
-        outcome_target: u16,
-        max_shares_in: U128
-    ) -> Promise {
-        self.assert_unpaused();
-        let initial_storage = env::storage_usage();
-        let collateral_out: u128 = collateral_out.into();
+        payout_numerator: Option<Vec<U128>>
+    ) {
+        self.assert_gov();
+        // let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
-        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
-        let escrowed = market.pool.sell(
-            &env::predecessor_account_id(),
-            collateral_out,
-            outcome_target,
-            max_shares_in.into()
-        );
+        assert!(!market.finalized, "ERR_IS_FINALIZED");
+        match &payout_numerator {
+            Some(v) => {
+                let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
+                assert_eq!(sum, market.pool.collateral_denomination, "ERR_INVALID_PAYOUT_SUM");
+                assert_eq!(v.len(), market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR");
+            },
+            None => ()
+        };
 
+        market.payout_numerator = payout_numerator;
+        market.finalized = true;
         self.markets.replace(market_id.into(), &market);
-        self.refund_storage(initial_storage, env::predecessor_account_id());
+        // self.refund_storage(initial_storage, env::predecessor_account_id());
 
-        collateral_token::ft_transfer(
-            env::predecessor_account_id(), 
-            U128(collateral_out - escrowed),
-            None,
-            &market.pool.collateral_token_id,
-            1,
-            GAS_BASE_COMPUTE
-        )
+        logger::log_market_status(&market);
     }
 
+    /**
+     * @notice claims earnings for the sender 
+     * @param market_id references the resoluted market to claim earnings for
+     */
     #[payable]
     pub fn claim_earnings(
         &mut self,
@@ -361,8 +497,13 @@ impl Protocol {
         }
     }
 
-
-    // Callback for collateral tokens
+    /**
+     * @notice a callback function only callable by the collateral token for this market
+     * @param sender_id the sender of the original transaction
+     * @param amount of tokens attached to this callback call
+     * @param msg can be a string of any type, in this case we expect a stringified json object
+     * @returns the amount of tokens that were not spend
+     */
     #[payable]
     pub fn ft_on_transfer(
         &mut self,
@@ -385,34 +526,11 @@ impl Protocol {
         0.into()
     }
 
-    /*** Gov setters ***/
-    #[payable]
-    pub fn resolute_market(
-        &mut self,
-        market_id: U64,
-        payout_numerator: Option<Vec<U128>>
-    ) {
-        self.assert_gov();
-        // let initial_storage = env::storage_usage();
-        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.finalized, "ERR_IS_FINALIZED");
-        match &payout_numerator {
-            Some(v) => {
-                let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
-                assert_eq!(sum, market.pool.collateral_denomination, "ERR_INVALID_PAYOUT_SUM");
-                assert_eq!(v.len(), market.pool.outcomes as usize, "ERR_INVALID_NUMERATOR");
-            },
-            None => ()
-        };
 
-        market.payout_numerator = payout_numerator;
-        market.finalized = true;
-        self.markets.replace(market_id.into(), &market);
-        // self.refund_storage(initial_storage, env::predecessor_account_id());
-
-        logger::log_market_status(&market);
-    }
-
+    /**
+     * @notice sets the `gov` `AccountId`, only callable by previous gov
+     * @param `AccountId` of the new `gov`
+     */
     pub fn set_gov(
         &mut self,
         new_gov: ValidAccountId
@@ -421,23 +539,34 @@ impl Protocol {
         self.gov = new_gov.into();
     }
 
+    /**
+     * @notice pauses the protocol making certain functions un-callable, can only be called by `gov`
+     */
     pub fn pause(&mut self) {
         self.assert_gov();
         self.paused = true;
     }
 
+    /**
+     * @notice un-pauses the protocol making it fully operational again
+     */
     pub fn unpause(&mut self) {
         self.assert_gov();
         self.paused = false;
     }
 
+    /**
+     * @notice sets the list of tokens that are to be used as collateral
+     * @param tokens list of `AccountId`s that can be used as collateral
+     * @param decimals list of the amount of decimals that are associated to the token with the same index
+     */
     pub fn set_token_whitelist(
         &mut self,
         tokens: Vec<ValidAccountId>, 
         decimals: Vec<u32>
     ) {
         self.assert_gov();
-        assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
+        assert_eq!(tokens.len(), decimals.len(), "tokens and decimals need to be of the same length");
         let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
         for (i, id) in tokens.into_iter().enumerate() {
@@ -449,6 +578,11 @@ impl Protocol {
         self.token_whitelist = token_whitelist
     }
 
+    /**
+     * @notice add a single specified `AccountId` to the whitelist
+     * @param to_add the token to add
+     * @param decimals to associate with the added token
+     */
     pub fn add_to_token_whitelist(
         &mut self,
         to_add: ValidAccountId,
@@ -460,56 +594,38 @@ impl Protocol {
         logger::log_whitelist(&self.token_whitelist);
 
     }
-
-    #[payable]
-    pub fn burn_outcome_tokens_redeem_collateral(
-        &mut self,
-        market_id: U64,
-        to_burn: U128
-    ) -> Promise {
-        self.assert_unpaused();
-        let initial_storage = env::storage_usage();
-
-        let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.finalized, "ERR_MARKET_FINALIZED");
-
-        let escrowed = market.pool.burn_outcome_tokens_redeem_collateral(
-            &env::predecessor_account_id(),
-            to_burn.into()
-        );
-
-        self.markets.replace(market_id.into(), &market);
-
-        self.refund_storage(initial_storage, env::predecessor_account_id());
-
-        let payout = u128::from(to_burn) - escrowed;
-
-        logger::log_transaction(&logger::TransactionType::Redeem, &env::predecessor_account_id(), to_burn.into(), payout, market_id, None);
-
-        collateral_token::ft_transfer(
-            env::predecessor_account_id(),
-            payout.into(),
-            None,
-            &market.pool.collateral_token_id,
-            1,
-            GAS_BASE_COMPUTE
-        )
-    }
 }
 
+/*** Private methods ***/
 impl Protocol {
+    /**
+     * @panics if the predecessor account is not `gov`
+     */
     fn assert_gov(&self) {
         assert_eq!(env::predecessor_account_id(), self.gov, "ERR_NO_GOVERNANCE_ADDRESS");
     }
 
-    fn get_market_expect(&self, market_id: U64) -> Market {
-        self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
-    }
-
+    /**
+     * @panics if the protocol is paused
+     */
     fn assert_unpaused(&self) {
         assert!(!self.paused, "ERR_PROTCOL_PAUSED")
     }
 
+    /**
+     * @notice get and return a certain market, panics if the market doesn't exist
+     * @returns the market
+     */
+    fn get_market_expect(&self, market_id: U64) -> Market {
+        self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
+    }
+
+    /**
+     * @notice add liquidity to a pool
+     * @param sender the sender of the original transfer_call
+     * @param total_in total amount of collateral to add to the market
+     * @param json string of `AddLiquidity` args
+     */
     fn add_liquidity(
         &mut self,
         sender: &AccountId,
@@ -541,6 +657,13 @@ impl Protocol {
         self.markets.replace(parsed_args.market_id.into(), &market);
     }
 
+
+    /**
+     * @notice buy an outcome token
+     * @param sender the sender of the original transfer_call
+     * @param total_in total amount of collateral to use for purchasing
+     * @param json string of `AddLiquidity` args
+     */
     fn buy(
         &mut self,
         sender: &AccountId,
@@ -563,7 +686,16 @@ impl Protocol {
         self.markets.replace(parsed_args.market_id.into(), &market);
     }
 
-    fn refund_storage(&self, initial_storage: StorageUsage, sender_id: AccountId) {
+    /**
+     * @notice refunds any cleared up or overpaid storage to original sender, also checks if the sender added enough deposit to cover storage
+     * @param initial_storage is the storage at the beginning of the function call
+     * @param sender_id is the `AccountId` that's to be refunded
+     */
+    fn refund_storage(
+        &self, 
+        initial_storage: StorageUsage, 
+        sender_id: AccountId
+    ) {
         let current_storage = env::storage_usage();
         let attached_deposit = env::attached_deposit();
         let refund_amount = if current_storage > initial_storage {
