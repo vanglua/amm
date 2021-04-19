@@ -95,7 +95,6 @@ impl Default for MintableFungibleToken {
 }
 
 impl MintableFungibleToken {
-    // TODO: rm seed_nonce
     pub fn new(pool_id: u64, outcome_id: u16, initial_supply: u128,) -> Self {
         Self {
             token: MintableToken::new(pool_id, outcome_id, initial_supply),
