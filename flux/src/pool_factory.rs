@@ -1,6 +1,11 @@
 use near_sdk::AccountId;
 use crate::pool::Pool;
 
+// TODO: remove, completely redunant function
+
+/**
+ * @notice takes pool params and creates and returns a new pool
+ */
 pub fn new_pool(
     pool_id: u64,
     outcomes: u16,
