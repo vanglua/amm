@@ -1,4 +1,4 @@
-/target/
-res/
+**/target/
+**/res/
 .DS_STORE
 /flux/target

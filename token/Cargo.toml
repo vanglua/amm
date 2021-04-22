@@ -12,11 +12,3 @@ near-sdk = { git = "https://github.com/near/near-sdk-rs.git", tag="contract_cach
 
 [dev-dependencies]
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs.git", tag="contract_cache_v0" }
-
-[profile.release]
-codegen-units=1
-opt-level = "z"
-lto = true
-debug = false
-panic = "abort"
-overflow-checks = true

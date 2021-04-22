@@ -1,6 +1,8 @@
 [workspace]
 members = [
-  "flux",
+  "amm",
+  "oracle",
+  "dao",
   "token"
 ]
 
