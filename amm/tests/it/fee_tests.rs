@@ -238,6 +238,7 @@ fn fee_invalid_market_lp_fee_test() {
         deposit = STORAGE_AMOUNT
     );
 
+    println!("{:?}", trader_claim_res);
     assert!(trader_claim_res.is_ok());
 
     // Get updated balances

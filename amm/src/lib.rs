@@ -16,6 +16,7 @@ construct_uint! {
 /** core */
 pub mod protocol;
 mod helper;
+mod resolution_escrow;
 mod msg_structs;
 mod pool_factory;
 mod pool;
