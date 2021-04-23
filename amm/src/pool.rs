@@ -20,55 +20,9 @@ use near_sdk::{
 use crate::math;
 use crate::constants;
 use crate::logger;
-
+use crate::resolution_escrow::ResolutionEscrows;
 use crate::outcome_token::MintableFungibleToken;
 
-/**
- * @notice stores the escrowed amount of tokens that should be paid out to the accounts in event of an (in)valid market
- */
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct ResolutionEscrow {
-    pub valid: u128, // amount of tokens to be paid out to an account if the market is valid
-    pub invalid: u128 // amount of tokens to be paid out to an account if the market is invalid
-}
-
-// TODO: remove or replace in `Account`-> currently not being utilized
-/**
- * @notice separately store LPs spent per outcome for LP positions. This is to ensure that amount spent is accounted for correctly as soon as an LP exits their position
- */
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct LPEntries {
-    entries: LookupMap<u64, u128> // maps outcome to spent on each outcome
-}
-
-/**
- * @notice struct keeping track of account state
- */
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct Account {
-    pub entries: LookupMap<u16, u128>, // Stores outcome => spent on each outcm=ome
-    pub lp_entries: LookupMap<u16, u128>, // TODO: Move to account, currently not being utilized
-    pub resolution_escrow: ResolutionEscrow // Stores all of the accounts funds that are stored till resolution 
-}
-
-impl Account {
-    /**
-     * @notice initializes a new `Account` struct
-     * @param pool_id the unique identifier for this pool - used for storage pointers
-     * @param the sender, the account that needs to be created - used for storage pointers
-     * @returns `Account`
-     */
-    pub fn new(pool_id: u64, sender: &AccountId) -> Self {
-        Account {
-            entries: LookupMap::new(format!("p{}ae{}", pool_id, sender).as_bytes().to_vec()),
-            lp_entries: LookupMap::new(format!("p{}lp{}", pool_id, sender).as_bytes().to_vec()), // TODO: Move to account, currently not being utilized
-            resolution_escrow: ResolutionEscrow {
-                valid: 0,
-                invalid: 0
-            }
-        }
-    }
-}
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Pool {
@@ -76,14 +30,13 @@ pub struct Pool {
     pub collateral_token_id: AccountId, // account id of the token that's used as collateral for this market
     pub collateral_denomination: u128, // the denomination of the collateral token
     pub outcomes: u16, // the number of outcomes tokens in this pool
-    pub lp_entries: LookupMap<AccountId, LPEntries>, // TODO: remove
     pub outcome_tokens: UnorderedMap<u16, MintableFungibleToken>, // maps outcome => outcome token implementation
     pub pool_token: MintableFungibleToken, // the token representing LP positions
     pub swap_fee: u128, // the fee paid to LPs on every swap, denominated in 1e4, meaning that 1 = 0.01% and 10000 = 100%
     pub withdrawn_fees: LookupMap<AccountId, u128>, // amount of accumulated fees an account is (no longer) ineligable to claim
     pub total_withdrawn_fees: u128, // total withdrawn fees
     pub fee_pool_weight: u128, // weighted fee pool used to calculate fees owed to accounts based on LP token share
-    pub accounts: LookupMap<AccountId, Account>, // maps account id's to `Account` structs
+    pub resolution_escrow: ResolutionEscrows // maps account_id => Resolution Escrow scruct
 }
 
 impl Pool {
@@ -113,7 +66,6 @@ impl Pool {
             id: pool_id,
             collateral_token_id,
             collateral_denomination,
-            lp_entries: LookupMap::new(format!("p{}lpe", pool_id).as_bytes().to_vec()),
             outcomes,
             outcome_tokens: UnorderedMap::new(format!("p{}ot", pool_id).as_bytes().to_vec()),
             pool_token: MintableFungibleToken::new(pool_id, outcomes, 0),
@@ -121,7 +73,7 @@ impl Pool {
             withdrawn_fees: LookupMap::new(format!("p{}wf", pool_id).as_bytes().to_vec()),
             total_withdrawn_fees: 0,
             fee_pool_weight: 0,
-            accounts: LookupMap::new(format!("p{}a", pool_id).as_bytes().to_vec()),
+            resolution_escrow: ResolutionEscrows::new(pool_id)
         }
     }
 
@@ -200,7 +152,7 @@ impl Pool {
         };
 
         self.mint_and_transfer_outcome_tokens(
-            sender,
+            sender.to_string(),
             total_in,
             &outcome_tokens_to_return
         );
@@ -214,49 +166,49 @@ impl Pool {
 
     fn mint_and_transfer_outcome_tokens(
         &mut self,
-        sender: &AccountId,
+        sender: AccountId,
         total_in: u128,
         outcome_tokens_to_return: &Vec<u128>
     ) {
-        let mut account = self.accounts.get(sender).unwrap_or_else(||Account::new(self.id, sender));
+        let mut escrow_account = self.resolution_escrow.get_or_new(sender.to_string());
 
         for (i, amount) in outcome_tokens_to_return.iter().enumerate() {
             let outcome = i as u16;
 
-            // Calculate the amount of money spent by the users on the total minted shares
+            // Since at LP stage we need to consider that they spent equal amount of money on each outcome (since if they'd immediately exit they'd have `total_in` of each outcome)
+            // we calculate spent_on_outcome as such: total collateral in / total outcomes. E.g. if there's 10 token_x provided to mint 10 YES and 10 NO tokens the LP spent 5 x on YES and 5 x on NO
+            // this is all to ensure the principle can be refunded in case of an invalid outcome
             let spent_on_outcome = total_in / self.outcomes as u128;
+
+            // The amount spent by the sender on amount the shares that are paid out at during liquidity provision needs to be accounted for.
+            // We calculate the amount spent on the outcome_tokens that are immediately returned to the user as follows: shares to transfer / total in * spent on shares
+            // e.g. if Alice spends 10 token_x to to mint 10 YES and 10 NO and in return they get 8 YES back they spent: 8 / 10 * 5 = 4x on those 8 YES tokens
             let spent_on_amount_out = if amount > &0 {
                 math::complex_mul_u128(self.collateral_denomination, spent_on_outcome, math::complex_div_u128(self.collateral_denomination, *amount, total_in))
             } else {
                 0
             };
 
-            // Delta needs to be used spent on outcome shares for outcome in exit pool
-            let lp_entry_amount = spent_on_outcome - spent_on_amount_out;
-            let prev_lp_entries = account.lp_entries.get(&outcome).unwrap_or(0);
-            account.lp_entries.insert(&outcome, &(prev_lp_entries + lp_entry_amount));
+            // Account for this new LP position on the LPs escrow account
+            let account_spent = escrow_account.lp_on_join(outcome, spent_on_outcome, spent_on_amount_out);
+            logger::log_account_outcome_spent(&self, &sender, outcome, account_spent);
 
-            let prev_spent = account.entries.get(&outcome).unwrap_or(0);
-            let spent = prev_spent + spent_on_amount_out;
-            account.entries.insert(&outcome, &spent);
-
-            logger::log_account_outcome_spent(&self, &sender, outcome, spent);
-
+            // Get the outcome token or else create one for this outcome
             let mut outcome_token = self.outcome_tokens
-            .get(&(outcome as u16))
-            .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, 0) });
+                .get(&(outcome as u16))
+                .unwrap_or_else(|| { MintableFungibleToken::new(self.id, outcome as u16, 0) });
             
+            // Mint the amount of newly created shares
             outcome_token.mint(& env::current_account_id(), total_in);
 
             if *amount > 0 {
-                outcome_token.safe_transfer_internal(&env::current_account_id(), sender, *amount);
+                outcome_token.safe_transfer_internal(&env::current_account_id(), &sender, *amount);
             }
 
-            self.accounts.insert(sender, &account);
             self.outcome_tokens.insert(&(outcome as u16), &outcome_token);
         }
 
-        self.accounts.insert(sender, &account);
+        self.resolution_escrow.insert(&sender, &escrow_account);
     }
 
     pub fn exit_pool(
@@ -269,82 +221,91 @@ impl Pool {
         let pool_token_supply = self.pool_token.total_supply();
         let sender_pool_token_balance = self.pool_token.get_balance(sender);
 
-        assert!(total_in <= sender_pool_token_balance, "ERR_INSUFFICIENT_BALANCE");
+        assert!(total_in <= sender_pool_token_balance, "sender only has {} lp tokens which is insufficient", sender_pool_token_balance);
 
-        let mut account = self.accounts.get(sender).expect("ERR_NO_ACCOUNT");
+        let mut escrow_account = self.resolution_escrow.get_expect(sender);
+
+        // TODO: redo to exit_divisor sender_pool_token_balance / total_in
+        // Calculate the relative amount of tokens sender is exiting. 
+        // e.g. if collateral has 18 decimals and sender has 10 LP tokens and is exiting 5: 5e18 / 10e18 = 5e17 (0.5) 
         let lp_token_exit_ratio = math::complex_div_u128(self.collateral_denomination, total_in, sender_pool_token_balance);
 
         for (i, balance) in balances.iter().enumerate() {
             let outcome = i as u16;
+
+            // Account for LP position exit
+            let current_lp_spent = escrow_account.get_lp_spent(outcome);
+            // Calculate how much the user spent on shares that are taken out of pool: lp_token_exit_ratio * current_lp_spent
+            let spent_on_exit_shares = math::complex_mul_u128(self.collateral_denomination, lp_token_exit_ratio, current_lp_spent);
+            // Account for lp exit 
+            let new_account_spent = escrow_account.lp_on_exit(outcome, spent_on_exit_shares);
+            logger::log_account_outcome_spent(&self, sender, outcome, new_account_spent);
+
+            // The amount of shares to return to the user are calculated as follows: pool tokens in / total pool token supply * contract balance of pool token
             let send_out = math::complex_mul_u128(self.collateral_denomination, math::complex_div_u128(self.collateral_denomination, total_in, pool_token_supply), *balance);
-
-            let current_spend = account.entries.get(&outcome).unwrap_or(0);
-
-            let account_total_spent_on_outcome = account.lp_entries.get(&outcome).unwrap_or(0);
-            let relative_spent = math::complex_mul_u128(self.collateral_denomination, lp_token_exit_ratio, account_total_spent_on_outcome);
-            let spent = current_spend + relative_spent;
-            account.entries.insert(&outcome, &spent);
-            account.lp_entries.insert(&outcome, &(account_total_spent_on_outcome - relative_spent));
-            logger::log_account_outcome_spent(&self, sender, outcome, spent);
-
-
             let mut token = self.outcome_tokens.get(&outcome).unwrap();
             token.safe_transfer_internal(&env::current_account_id(), sender, send_out);
             self.outcome_tokens.insert(&outcome, &token);
         }
 
-        self.accounts.insert(&sender, &account);
+        self.resolution_escrow.insert(&sender, &escrow_account);
         let fees = self.burn_internal(sender, total_in);
         logger::log_exit_pool(&self, sender, total_in, fees);
         fees
     }
 
-    pub fn burn_outcome_tokens_redeem_collateral (
+    pub fn burn_outcome_tokens_redeem_collateral(
         &mut self,
         sender: &AccountId,
         to_burn: u128
     ) -> u128 {
-        let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCES");
+        let mut escrow_account = self.resolution_escrow.get_expect(sender);
 
         let avg_price_paid = self.outcome_tokens.iter().fold(0, |sum, (outcome, mut token)| {
 
-            // Calc avg price per outcome
-            let spent_on_outcome = account.entries.get(&outcome).unwrap_or_else(|| panic!("ERR_NO_ENTRIES_{}", outcome));
-            let user_balance = token.get_balance(sender);
-            assert!(user_balance > 0, "ERR_NO_BALANCE_OUTCOME_{}", outcome);
-            let price_paid_per_share = math::complex_div_u128(self.collateral_denomination, spent_on_outcome, user_balance);
+            let outcome_balance = token.get_balance(sender);
+            let outcome_spent = escrow_account.get_spent(outcome);
+            assert!(outcome_balance > 0, "sender doesn't have any shares for outcome with index {}", outcome);
 
-            // subtract sold off tokens from entries
-            let redeemed_spent = math::complex_mul_u128(self.collateral_denomination, math::complex_div_u128(self.collateral_denomination, to_burn, user_balance), spent_on_outcome);
-            let new_entry_balance = spent_on_outcome - redeemed_spent;
-            account.entries.insert(&outcome, &new_entry_balance);
-            logger::log_account_outcome_spent(&self, sender, outcome, new_entry_balance);
+            // Avg price paid is calculated as follows: total spent / total balance
+            // e.g. if sender has 5 shares and spent 10 used paid: 5 / 10 = 0.5 per share
+            let avg_price_paid = math::complex_div_u128(self.collateral_denomination, outcome_spent, outcome_balance); // TODO: also work with divisors over ratio
+
+            // TODO: once again divisors over ratio
+            // Calculate how much should be subtracted from spent for this redemption, calculated as follows: outcome tokens to burn / balance of outcome tokens * spent on outcome
+            // e.g. if sender has spent 15 collateral(x) on 5 shares of each outcome and is burning 4: 4 / 5 * 15 = 12
+            let spent_on_redeemed_shares = math::complex_mul_u128(self.collateral_denomination, math::complex_div_u128(self.collateral_denomination, to_burn, outcome_balance), outcome_spent);
+
+            let new_spent = escrow_account.sub_from_spent(outcome, spent_on_redeemed_shares);
+            logger::log_account_outcome_spent(&self, sender, outcome, new_spent);
 
             // Burn outcome tokens accordingly 
             token.burn(sender, to_burn);
 
-            sum + price_paid_per_share
+            sum + avg_price_paid
         });
 
         // If the user paid less than 1 they have the right to claim the difference if the market turns out valid
         // If the users paid more than 1 they will have the right to claim the difference if the market turns out invalid
         let in_escrow = match avg_price_paid.cmp(&self.collateral_denomination) {
             std::cmp::Ordering::Greater => {
-                let delta = avg_price_paid - self.collateral_denomination;
-                account.resolution_escrow.invalid += math::complex_mul_u128(self.collateral_denomination, delta, to_burn) - 1;
+                let loss_per_share = avg_price_paid - self.collateral_denomination;
+                // Escrow loss_per_share * shares to burn. this will be claimable if the market is invalid
+                escrow_account.add_to_escrow_invalid(math::complex_mul_u128(self.collateral_denomination, loss_per_share, to_burn) - 1); // TODO: remove need for -1
                 0
             },
             std::cmp::Ordering::Less => {
-                let delta = self.collateral_denomination - avg_price_paid;
-                let to_escrow = math::complex_mul_u128(self.collateral_denomination, delta, to_burn) - 1;
-                account.resolution_escrow.valid += to_escrow;
-                to_escrow + 1
+                let profit_per_share = self.collateral_denomination - avg_price_paid;
+                // Escrow loss_per_share * shares to burn - this will be claimable if the market is invalid
+                let to_escrow =math::complex_mul_u128(self.collateral_denomination, profit_per_share, to_burn) - 1; // TODO: remove need for -1
+                escrow_account.add_to_escrow_valid(to_escrow); 
+                to_escrow + 1 // TODO: remove need for +1
             }, 
             std::cmp::Ordering::Equal => 0
         };
 
         // Store updated account
-        self.accounts.insert(sender, &account);
+        self.resolution_escrow.insert(sender, &escrow_account);
 
         in_escrow
     }
@@ -518,15 +479,13 @@ impl Pool {
         let shares_out = self.calc_buy_amount(amount_in, outcome_target);
         assert!(shares_out >= min_shares_out, "ERR_MIN_BUY_AMOUNT");
 
-        let mut account = self.accounts.get(sender).unwrap_or_else(||{Account::new(self.id, sender)});
+        let mut escrow_account = self.resolution_escrow.get_or_new(sender.to_string());
 
         // Transfer collateral in
         let fee = math::complex_mul_u128(self.collateral_denomination, amount_in, self.swap_fee);
         self.fee_pool_weight += fee;
 
-        let current_spend_on_outcome = account.entries.get(&outcome_target).unwrap_or(0);
-        let spent = current_spend_on_outcome + amount_in - fee;
-        account.entries.insert(&outcome_target, &spent);
+        let spent = escrow_account.add_to_spent(outcome_target, amount_in - fee);
         logger::log_account_outcome_spent(&self, sender, outcome_target, spent);
 
         let tokens_to_mint = amount_in - fee;
@@ -535,7 +494,7 @@ impl Pool {
         let mut token_out = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
         token_out.safe_transfer_internal(&env::current_account_id(), sender, shares_out);
         self.outcome_tokens.insert(&outcome_target, &token_out);
-        self.accounts.insert(sender, &account);
+        self.resolution_escrow.insert(sender, &escrow_account);
 
         logger::log_buy(&self, &sender, outcome_target, amount_in, shares_out, fee);
         logger::log_pool(&self);
@@ -555,9 +514,11 @@ impl Pool {
         assert!(shares_in <= max_shares_in, "ERR_MAX_SELL_AMOUNT");
         let mut token_in = self.outcome_tokens.get(&outcome_target).expect("ERR_NO_TARGET_OUTCOME");
 
-        let mut account = self.accounts.get(sender).expect("ERR_NO_BALANCE");
-        let spent = account.entries.get(&outcome_target).expect("ERR_NO_ENTRIES");
+        let mut escrow_account = self.resolution_escrow.get_expect(sender);
+        let spent = escrow_account.get_spent(outcome_target);
+        assert!(spent > 0, "account has no balance of outcome {} shares", outcome_target);
 
+        // TODO: redo math and try to fit it into resolution_escrow
         let fee = math::complex_mul_u128(self.collateral_denomination, amount_out, self.swap_fee);
         let avg_price = math::complex_div_u128(self.collateral_denomination, spent, token_in.get_balance(sender));
         let sell_price = math::complex_div_u128(self.collateral_denomination, amount_out + fee, shares_in);
@@ -571,36 +532,35 @@ impl Pool {
             Ordering::Less => {
                 let price_delta = avg_price - sell_price;
                 let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
-                account.resolution_escrow.invalid += escrow_amt;
-                logger::log_to_invalid_escrow(self.id, &sender, account.resolution_escrow.invalid);
-                
-                let new_spent = spent - (amount_out + escrow_amt) - fee;
+                let invalid_escrow = escrow_account.add_to_escrow_invalid(escrow_amt);
+                logger::log_to_invalid_escrow(self.id, &sender, invalid_escrow);
+
+                // TODO: sub from spent and logging it is done in both cases, remove dup code
+                let new_spent = escrow_account.sub_from_spent(outcome_target, amount_out + escrow_amt + fee);
                 logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
-                account.entries.insert(&outcome_target, &new_spent);
                 0
             },
             Ordering::Greater => {
                 let price_delta = sell_price - avg_price;
                 let escrow_amt = math::simple_mul_u128(self.collateral_denomination, price_delta, shares_in);
-                account.resolution_escrow.valid += escrow_amt;
-                logger::log_to_valid_escrow(self.id, &sender, account.resolution_escrow.valid);
+                let valid_escrow = escrow_account.add_to_escrow_valid(escrow_amt);
+                logger::log_to_valid_escrow(self.id, &sender, valid_escrow);
                 let entries_to_sub = amount_out - escrow_amt + fee;
 
+                // TODO: entries_to_sub should never be larger than spent
                 if entries_to_sub > spent {
-                    account.entries.insert(&outcome_target, &0);
-                    logger::log_account_outcome_spent(&self, &sender, outcome_target, 0);
+                    let new_spent = escrow_account.sub_from_spent(outcome_target, spent);
+                    logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 } else {
-                    let new_spent = spent - entries_to_sub;
-                    account.entries.insert(&outcome_target, &new_spent);
+                    let new_spent = escrow_account.sub_from_spent(outcome_target, entries_to_sub);
                     logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 }
+
 
                 escrow_amt
             },
             Ordering::Equal => {
-                let new_spent = spent - amount_out - fee;
-
-                account.entries.insert(&outcome_target, &new_spent);
+                let new_spent = escrow_account.sub_from_spent(outcome_target, amount_out - fee);
                 logger::log_account_outcome_spent(&self, &sender, outcome_target, new_spent);
                 0
             }
@@ -608,7 +568,7 @@ impl Pool {
 
         let tokens_to_burn = amount_out + fee;
         self.remove_from_pools(tokens_to_burn);
-        self.accounts.insert(&env::predecessor_account_id(), &account);
+        self.resolution_escrow.insert(sender, &escrow_account);
 
         logger::log_sell(&self, &env::predecessor_account_id(), outcome_target, shares_in, amount_out, fee, to_escrow);
         logger::log_pool(&self);
@@ -629,7 +589,7 @@ impl Pool {
         };
 
         let balances = self.get_and_clear_balances(account_id);
-        let account = match self.accounts.get(account_id) {
+        let escrow_account = match self.resolution_escrow.get(account_id) {
             Some(account) => account,
             None => return 0
         };
@@ -639,15 +599,15 @@ impl Pool {
                 let bal = balances[outcome];
                 let payout = math::complex_mul_u128(self.collateral_denomination, bal, u128::from(*num));
                 sum + payout
-            }) + account.resolution_escrow.valid
+            }) + escrow_account.valid
         } else {
             balances.iter().enumerate().fold(0, |sum, (outcome, _bal)| {                
-                let spent = account.entries.get(&(outcome as u16)).unwrap_or(0);
+                let spent = escrow_account.get_spent(outcome as u16);
                 sum + spent
-            }) + account.resolution_escrow.invalid
+            }) + escrow_account.invalid
         };
 
-        self.accounts.remove(&account_id);
+        self.resolution_escrow.remove(&account_id);
 
         payout + fees_earned
     }
