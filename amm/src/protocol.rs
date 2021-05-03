@@ -126,8 +126,6 @@ impl Protocol {
         U128(market.pool.pool_token.total_supply())
     }
 
-
-
     /**
      * @param market_id is the index of the market to retrieve data from
      * @returns all of the outcome balances for a specific pool
