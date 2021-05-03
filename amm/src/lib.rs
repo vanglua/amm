@@ -20,6 +20,7 @@ mod resolution_escrow;
 mod msg_structs;
 mod pool_factory;
 mod pool;
+mod collateral_whitelist;
 mod outcome_token;
 
 /** utils */
