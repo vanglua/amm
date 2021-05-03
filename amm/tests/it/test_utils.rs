@@ -36,49 +36,71 @@ const TOKEN_CONTRACT_ID: &str = "token";
 const AMM_CONTRACT_ID: &str = "amm";
 
 // Load in contract bytes
-near_sdk_sim::lazy_static! {
-    static ref AMM_WASM_BYTES: &'static [u8] = include_bytes!("../../../res/amm.wasm").as_ref();
-    static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../../../res/token.wasm").as_ref();
+near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
+    AMM_WASM_BYTES => "../../../res/amm.wasm",
+    TOKEN_WASM_BYTES => "../../../res/token.wasm",
 }
 
 pub fn init(
     gov_id: AccountId
-) -> (UserAccount, ContractAccount<ProtocolContract>, AccountId, UserAccount, UserAccount, UserAccount) {
+) -> (UserAccount, UserAccount, AccountId, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
 
-    // deploy amm
-    let amm_contract = deploy!(
-        // Contract Proxy
-        contract: ProtocolContract,
-        // Contract account id
-        contract_id: AMM_CONTRACT_ID,
-        // Bytes of contract
-        bytes: &AMM_WASM_BYTES,
-        // User deploying the contract,
-        signer_account: master_account,
-        deposit: to_yocto("1000"),
-        // init method
-        init_method: init(
-            gov_id.try_into().unwrap(),
-            vec!["token".try_into().unwrap()],
-            vec![24]
-        )
+    let amm_contract = master_account.deploy_and_init(
+        &AMM_WASM_BYTES, 
+        AMM_CONTRACT_ID.to_string(), 
+        "init", 
+        json!({
+            "gov": gov_id.try_into().unwrap(),
+            "tokens":  vec!["token".try_into().unwrap()],
+            "decimals": [24],
+        }).to_string().as_bytes(), 
+        to_yocto("1000"), 
+        DEFAULT_GAS
+    );
+
+    // // deploy amm
+    // let amm_contract = master_account.deploy_and_init(
+    //     // Contract Proxy
+    //     contract: ProtocolContract,
+    //     // Contract account id
+    //     contract_id: AMM_CONTRACT_ID,
+    //     // Bytes of contract
+    //     bytes: &AMM_WASM_BYTES,
+    //     // User deploying the contract,
+    //     signer_account: master_account,
+    //     deposit: to_yocto("1000"),
+    //     // init method
+    //     init_method: init(
+    //         gov_id.try_into().unwrap(),
+    //         vec!["token".try_into().unwrap()],
+    //         vec![24]
+    //     )
+    // );
+
+    let token_contract = master_account.deploy_and_init(
+        &TOKEN_WASM_BYTES, 
+        TOKEN_CONTRACT_ID.to_string(), 
+        "new", 
+        json!({}).to_string().as_bytes(), 
+        to_yocto("1000"), 
+        DEFAULT_GAS
     );
 
     // deploy token
-    let token_contract = deploy!(
-        // Contract Proxy
-        contract: ContractContract,
-        // Contract account id
-        contract_id: TOKEN_CONTRACT_ID,
-        // Bytes of contract
-        bytes: &TOKEN_WASM_BYTES,
-        // User deploying the contract,
-        signer_account: master_account,
-        deposit: to_yocto("1000"),
-        // init method
-        init_method: new()
-    );
+    // let token_contract = master_account.deploy(
+    //     // Contract Proxy
+    //     contract: ContractContract,
+    //     // Contract account id
+    //     contract_id: TOKEN_CONTRACT_ID,
+    //     // Bytes of contract
+    //     bytes: &TOKEN_WASM_BYTES,
+    //     // User deploying the contract,
+    //     signer_account: master_account,
+    //     deposit: to_yocto("1000"),
+    //     // init method
+    //     init_method: new()
+    // );
 
     let storage_amount = get_storage_amount(&master_account);
     storage_deposit(&master_account, storage_amount.into(), Some(AMM_CONTRACT_ID.to_string()));
@@ -98,12 +120,11 @@ pub fn init(
 
 pub fn get_storage_amount(sender: &UserAccount) -> U128 {
     sender.view(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID, 
-            "storage_minimum_balance", 
-            json!({}), 
-            true
-        )
+        TOKEN_CONTRACT_ID.to_string(), 
+        "storage_minimum_balance", 
+        json!({})
+        .to_string()
+        .as_bytes(), 
     ).unwrap_json()
 }
 
@@ -117,44 +138,41 @@ pub fn init_balance() -> u128 {
 
 pub fn storage_deposit(sender: &UserAccount, deposit: u128, to_register: Option<AccountId>) {
     let res = sender.call(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID,
-            "storage_deposit",
-            json!({
-                "account_id": to_register
-            }),
-            false
-        ),
+        TOKEN_CONTRACT_ID.to_string(),
+        "storage_deposit",
+        json!({
+            "account_id": to_register
+        })
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
         deposit,
-        DEFAULT_GAS
     );
     assert!(res.is_ok(), "storage deposit failed with res: {:?}", res);
 }
 
 pub fn near_deposit(sender: &UserAccount, deposit: u128) {
     let res = sender.call(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID,
-            "near_deposit",
-            json!({}),
-            false
-        ),
+        TOKEN_CONTRACT_ID.to_string(),
+        "near_deposit",
+        json!({})
+        .to_string()
+        .as_bytes(),
+        DEFAULT_GAS,
         deposit,
-        DEFAULT_GAS
     );
     assert!(res.is_ok(), "wnear deposit failed with res: {:?}", res);
 }
 
 pub fn ft_balance_of(sender: &UserAccount, account_id: &AccountId) -> U128 {
     sender.view(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID, 
-            "ft_balance_of", 
-            json!({
-                "account_id": account_id.to_string()
-            }), 
-            true
-        )
+        TOKEN_CONTRACT_ID.to_string(), 
+        "ft_balance_of", 
+        json!({
+            "account_id": account_id.to_string()
+        })
+        .to_string()
+        .as_bytes(), 
     ).unwrap_json()
 }
 
@@ -164,18 +182,18 @@ pub fn transfer_unsafe(
     amount: u128,
 ) {
     let res = sender.call(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID, 
-            "ft_transfer", 
-            json!({
-                "receiver_id": receiver_id,
-                "amount": U128::from(amount),
-                "memo": "".to_string()
-            }), 
-            true
-        ),
+        TOKEN_CONTRACT_ID.to_string(), 
+        "ft_transfer", 
+        json!({
+            "receiver_id": receiver_id,
+            "amount": U128::from(amount),
+            "memo": "".to_string()
+        })
+        .to_string()
+        .as_bytes(), 
+            // true said it was view ??
+        DEFAULT_GAS,
         1,
-        DEFAULT_GAS
     );
 
     assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
@@ -186,19 +204,19 @@ pub fn ft_transfer_call(
     msg: String
 ) {
     let res = sender.call(
-        PendingContractTx::new(
-            TOKEN_CONTRACT_ID, 
-            "ft_transfer_call", 
-            json!({
-                "receiver_id": AMM_CONTRACT_ID.to_string(),
-                "amount": U128::from(amount),
-                "msg": msg,
-                "memo": "".to_string()
-            }), 
-            true
-        ),
+        TOKEN_CONTRACT_ID.to_string(), 
+        "ft_transfer_call", 
+        json!({
+            "receiver_id": AMM_CONTRACT_ID.to_string(),
+            "amount": U128::from(amount),
+            "msg": msg,
+            "memo": "".to_string()
+        })
+        .to_string()
+        .as_bytes(), 
+        // true
+        DEFAULT_GAS,
         1,
-        DEFAULT_GAS
     );
 
     assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);

@@ -40,8 +40,8 @@ dependencies = [
 name = "amm"
 version = "0.1.0"
 dependencies = [
- "near-sdk 3.0.0",
- "near-sdk-sim 3.0.0-pre-release",
+ "near-sdk 3.1.0",
+ "near-sdk-sim 3.1.1",
  "serde",
  "token",
  "uint 0.8.5",
@@ -697,7 +697,7 @@ dependencies = [
  "hex",
  "near-contract-standards",
  "near-sdk 3.1.0",
- "near-sdk-sim 3.1.0",
+ "near-sdk-sim 3.1.1",
 ]
 
 [[package]]
@@ -1934,9 +1934,9 @@ dependencies = [
 
 [[package]]
 name = "near-sdk-sim"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdedcf70a6bf5b7d9062e2ebd3dbd80955d062f63b8da7a5d81e77e685fbbc89"
+checksum = "1dcd570086892499dc5e3215987ced0f6291803e264d475073b442a4eb829248"
 dependencies = [
  "funty",
  "lazy-static-include",
