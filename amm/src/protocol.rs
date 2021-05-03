@@ -31,6 +31,7 @@ use crate::pool::Pool;
 use crate::logger;
 use crate::pool_factory;
 use crate::msg_structs;
+use crate::collateral_whitelist::Whitelist;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
@@ -53,7 +54,7 @@ pub trait CollateralToken {
 pub struct Protocol {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>, // Vector containing all markets where the index represents the market id
-    token_whitelist: UnorderedMap<AccountId, u32>, // Map a token's account id to number of decimals it's denominated in
+    collateral_whitelist: Whitelist, // Map a token's account id to number of decimals it's denominated in
     paused: bool // If true certain functions are no longer callable, settable by `gov`
 }
 
@@ -62,7 +63,7 @@ impl Protocol {
     /**
      * @notice Initialize the contract by setting global contract attributes
      * @param gov is the `AccountId` of the account with governance privilages
-     * @param token_whitelist is a list of tokens that can be used ås collateral
+     * @param collateral_whitelist is a list of tokens that can be used ås collateral
      */
     #[init]
     pub fn init(
@@ -72,21 +73,21 @@ impl Protocol {
     ) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         assert_eq!(tokens.len(), decimals.len(), "ERR_INVALID_INIT_VEC_LENGTHS");
-        let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
+        let mut collateral_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
         // Combine `tokens` (key) and `decimals` (value) into an `UnorderedMap`
         for (i, id) in tokens.into_iter().enumerate() {
             let decimal = decimals[i];
             let account_id: AccountId = id.into();
-            token_whitelist.insert(&account_id, &decimal);
+            collateral_whitelist.insert(&account_id, &decimal);
         };
 
-        logger::log_whitelist(&token_whitelist);
+        logger::log_whitelist(&collateral_whitelist);
 
         Self {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
-            token_whitelist, 
+            collateral_whitelist, 
             paused: false
         }
     }
@@ -125,12 +126,7 @@ impl Protocol {
         U128(market.pool.pool_token.total_supply())
     }
 
-    /**
-     * @returns the whitelisted collateral tokens
-     */
-    pub fn get_token_whitelist(&self) -> Vec<(AccountId, u32)> {
-        self.token_whitelist.to_vec()
-    }
+
 
     /**
      * @param market_id is the index of the market to retrieve data from
@@ -268,7 +264,7 @@ impl Protocol {
         let end_time: u64 = end_time.into();
         let swap_fee: u128 = swap_fee.into();
         let market_id = self.markets.len();
-        let token_decimals = self.token_whitelist.get(&collateral_token_id);
+        let token_decimals = self.collateral_whitelist.get(&collateral_token_id);
         assert!(token_decimals.is_some(), "ERR_INVALID_COLLATERAL");
         assert!(outcome_tags.len() as u16 == outcomes, "ERR_INVALID_TAG_LENGTH");
         assert!(end_time > ns_to_ms(env::block_timestamp()), "ERR_INVALID_END_TIME");
@@ -559,22 +555,22 @@ impl Protocol {
      * @param tokens list of `AccountId`s that can be used as collateral
      * @param decimals list of the amount of decimals that are associated to the token with the same index
      */
-    pub fn set_token_whitelist(
+    pub fn set_collateral_whitelist(
         &mut self,
         tokens: Vec<ValidAccountId>, 
         decimals: Vec<u32>
     ) {
         self.assert_gov();
         assert_eq!(tokens.len(), decimals.len(), "tokens and decimals need to be of the same length");
-        let mut token_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
+        let mut collateral_whitelist: UnorderedMap<AccountId, u32> = UnorderedMap::new(b"wl".to_vec());
 
         for (i, id) in tokens.into_iter().enumerate() {
             let decimal = decimals[i];
             let account_id: AccountId = id.into();
-            token_whitelist.insert(&account_id, &decimal);
+            collateral_whitelist.insert(&account_id, &decimal);
         };
-        logger::log_whitelist(&token_whitelist);
-        self.token_whitelist = token_whitelist
+        logger::log_whitelist(&collateral_whitelist);
+        self.collateral_whitelist = collateral_whitelist
     }
 
     /**
@@ -582,15 +578,15 @@ impl Protocol {
      * @param to_add the token to add
      * @param decimals to associate with the added token
      */
-    pub fn add_to_token_whitelist(
+    pub fn add_to_collateral_whitelist(
         &mut self,
         to_add: ValidAccountId,
         decimals: u32
     ) {
         self.assert_gov();
         let account_id = to_add.into();
-        self.token_whitelist.insert(&account_id, &decimals);
-        logger::log_whitelist(&self.token_whitelist);
+        self.collateral_whitelist.insert(&account_id, &decimals);
+        logger::log_whitelist(&self.collateral_whitelist);
 
     }
 }
