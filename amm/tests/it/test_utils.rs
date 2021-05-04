@@ -29,7 +29,7 @@ extern crate amm;
 
 pub use amm::*;
 use token::*;
-use amm::protocol::ProtocolContract;
+use amm::AMMContractContract;
 
 const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 const TOKEN_CONTRACT_ID: &str = "token";
@@ -43,13 +43,13 @@ near_sdk_sim::lazy_static! {
 
 pub fn init(
     gov_id: AccountId
-) -> (UserAccount, ContractAccount<ProtocolContract>, AccountId, UserAccount, UserAccount, UserAccount) {
+) -> (UserAccount, ContractAccount<AMMContractContract>, AccountId, UserAccount, UserAccount, UserAccount) {
     let master_account = init_simulator(None);
 
     // deploy amm
     let amm_contract = deploy!(
         // Contract Proxy
-        contract: ProtocolContract,
+        contract: AMMContractContract,
         // Contract account id
         contract_id: AMM_CONTRACT_ID,
         // Bytes of contract
@@ -60,8 +60,7 @@ pub fn init(
         // init method
         init_method: init(
             gov_id.try_into().unwrap(),
-            vec!["token".try_into().unwrap()],
-            vec![24]
+            vec![amm::collateral_whitelist::Token{account_id: "token".to_string(), decimals: 24}]
         )
     );
 
@@ -222,7 +221,7 @@ pub fn fee() -> U128 {
     (10_u128.pow(24) / 50).into() // 2%
 }
 
-pub fn create_market(creator: &UserAccount, amm: &ContractAccount<ProtocolContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
+pub fn create_market(creator: &UserAccount, amm: &ContractAccount<AMMContractContract>, outcomes: u16, fee_opt: Option<U128>) -> U64 {
     call!(
         creator,
         amm.create_market(empty_string(), empty_string(), outcomes, empty_string_vec(outcomes), empty_string_vec(2), env_time(), "token".to_string(), fee_opt.unwrap_or(fee()), None),

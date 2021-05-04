@@ -1,18 +1,6 @@
-use near_sdk::{
-    env,
-    AccountId,
-	json_types::{
-        U64,
-        U128,
-    },
-    serde_json::json,
-    collections::UnorderedMap
-};
-
-use crate::protocol::{ Market };
-use crate::pool::{ Pool };
-use crate::outcome_token::{ MintableToken };
-use crate::helper::{ ns_to_ms };
+use crate:: *;
+use near_sdk::serde_json::json;
+use outcome_token::MintableToken;
 
 #[derive(serde::Serialize)]
 pub enum TransactionType {
@@ -66,14 +54,14 @@ pub fn log_pool(pool: &Pool) {
 	);
 }
 
-pub fn log_whitelist(whitelist: &UnorderedMap<AccountId, u32>) {
+pub fn log_whitelist(whitelist: &Whitelist) {
     env::log(
 		json!({
             "type": "token_whitelist".to_string(),
             "action": "update",
             "cap_id": "wl",
 			"params": {
-                "whitelist": whitelist.to_vec()
+                "whitelist": whitelist.0.to_vec()
 			}
 		})
 		.to_string()

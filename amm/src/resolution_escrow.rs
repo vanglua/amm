@@ -1,21 +1,4 @@
-
-use near_sdk::{
-    env,
-    AccountId,
-    json_types::{
-        U128,
-        U64,
-    },
-    collections::{
-        UnorderedMap,
-        LookupMap
-    },
-    borsh::{
-        self,
-        BorshDeserialize,
-        BorshSerialize,
-    },
-};
+use crate::*;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct OutcomeToBalanceMap(LookupMap<u16, u128>);

@@ -1,4 +1,9 @@
-use crate::u256;
+use uint::construct_uint;
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct u256(4);
+}
+
 
 /** 
  * @notice complex multiplication function that takes decimals into account, e.g. if a token has 18 decimals:

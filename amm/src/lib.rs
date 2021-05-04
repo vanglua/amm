@@ -1,30 +1,219 @@
-#![warn(clippy::all, clippy::pedantic)]
-#![allow(dead_code, clippy::must_use_candidate, clippy::too_many_lines, clippy::struct_excessive_bools, clippy::ptr_arg, clippy::tabs_in_doc_comments, clippy::too_many_arguments, clippy::cast_possible_truncation)]
-#[cfg(feature = "wee_alloc")]
+#![allow(clippy::too_many_arguments)]
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::json_types::{U128, U64, ValidAccountId};
+use near_sdk::collections::{Vector, UnorderedMap, LookupMap};
+use near_sdk::{
+    PromiseOrValue,
+    Balance,
+    StorageUsage,
+    Gas,
+    ext_contract,
+    near_bindgen,
+    Promise,
+    PanicOnDefault,
+    serde_json,
+    AccountId,
+    env
+};
 
-#[cfg(target = "wasm32")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+near_sdk::setup_alloc!();
 
+mod helper;
+mod pool;
+mod logger;
+mod constants;
+mod outcome_token;
+mod pool_factory;
+mod msg_structs;
+mod resolution_escrow;
+mod market;
+mod gov; 
+pub mod collateral_whitelist; // pub for integration tests 
+pub mod math; // pub for integration tests
 
-use uint::construct_uint;
-construct_uint! {
-    /// 256-bit unsigned integer.
-    pub struct u256(4);
+use crate::helper::*;
+use crate::market::Market;
+use crate::pool::Pool;
+use crate::collateral_whitelist::Whitelist;
+
+const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
+const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+
+#[ext_contract]
+pub trait CollateralToken {
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
-/** core */
-pub mod protocol;
-mod helper;
-mod resolution_escrow;
-mod msg_structs;
-mod pool_factory;
-mod pool;
-mod collateral_whitelist;
-mod outcome_token;
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+pub struct AMMContract {
+    gov: AccountId, // The gov of all markets
+    markets: Vector<Market>, // Vector containing all markets where the index represents the market id
+    collateral_whitelist: Whitelist, // Map a token's account id to number of decimals it's denominated in
+    paused: bool // If true certain functions are no longer callable, settable by `gov`
+}
 
-/** utils */
-pub mod math;
-mod logger;
+#[near_bindgen]
+impl AMMContract {
+    /**
+     * @notice Initialize the contract by setting global contract attributes
+     * @param gov is the `AccountId` of the account with governance privilages
+     * @param collateral_whitelist is a list of tokens that can be used ås collateral
+     */
+    #[init]
+    pub fn init(
+        gov: ValidAccountId, 
+        tokens: Vec<collateral_whitelist::Token>, 
+    ) -> Self {
+        assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
+        let mut collateral_whitelist: Whitelist = Whitelist::new(tokens);
 
-pub mod constants;
+        logger::log_whitelist(&collateral_whitelist);
+
+        Self {
+            gov: gov.into(),
+            markets: Vector::new(b"m".to_vec()),
+            collateral_whitelist: collateral_whitelist, 
+            paused: false
+        }
+    }
+
+    /**
+     * @notice a callback function only callable by the collateral token for this market
+     * @param sender_id the sender of the original transaction
+     * @param amount of tokens attached to this callback call
+     * @param msg can be a string of any type, in this case we expect a stringified json object
+     * @returns the amount of tokens that were not spend
+     */
+    #[payable]
+    pub fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        msg: String,
+    ) -> U128 {
+        self.assert_unpaused();
+        let amount: u128 = amount.into();
+        assert!(amount > 0, "ERR_ZERO_AMOUNT");
+
+        let parsed_msg: msg_structs::InitStruct = serde_json::from_str(msg.as_str()).expect("ERR_INCORRECT_JSON");
+
+        match parsed_msg.function.as_str() {
+            "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
+            "buy" => self.buy(&sender_id, amount, parsed_msg.args),
+            _ => panic!("ERR_UNKNOWN_FUNCTION")
+        };
+
+        0.into()
+    }
+
+
+}
+
+/*** Private methods ***/
+impl AMMContract {
+    /**
+     * @notice get and return a certain market, panics if the market doesn't exist
+     * @returns the market
+     */
+    fn get_market_expect(&self, market_id: U64) -> Market {
+        self.markets.get(market_id.into()).expect("ERR_NO_MARKET")
+    }
+
+    /**
+     * @notice add liquidity to a pool
+     * @param sender the sender of the original transfer_call
+     * @param total_in total amount of collateral to add to the market
+     * @param json string of `AddLiquidity` args
+     */
+    fn add_liquidity(
+        &mut self,
+        sender: &AccountId,
+        total_in: u128,
+        args: serde_json::Value,
+    ) {
+        let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
+        let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
+            Some(weight_indication) => {
+                Some(weight_indication
+                    .iter()
+                    .map(|weight| { u128::from(*weight) })
+                    .collect()
+                )
+            },
+            None => None
+        };
+           
+        let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
+        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        assert_collateral_token(&market.pool.collateral_token_id);
+        
+        market.pool.add_liquidity(
+            &sender,
+            total_in,
+            weights_u128
+        );
+        self.markets.replace(parsed_args.market_id.into(), &market);
+    }
+
+
+    /**
+     * @notice buy an outcome token
+     * @param sender the sender of the original transfer_call
+     * @param total_in total amount of collateral to use for purchasing
+     * @param json string of `AddLiquidity` args
+     */
+    fn buy(
+        &mut self,
+        sender: &AccountId,
+        collateral_in: u128, 
+        args: serde_json::Value,
+    ) {
+        let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
+        let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
+        assert!(!market.finalized, "ERR_FINALIZED_MARKET");
+        assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
+        assert_collateral_token(&market.pool.collateral_token_id);
+        
+        market.pool.buy(
+            &sender,
+            collateral_in,
+            parsed_args.outcome_target,
+            parsed_args.min_shares_out.into()
+        );
+
+        self.markets.replace(parsed_args.market_id.into(), &market);
+    }
+
+    /**
+     * @notice refunds any cleared up or overpaid storage to original sender, also checks if the sender added enough deposit to cover storage
+     * @param initial_storage is the storage at the beginning of the function call
+     * @param sender_id is the `AccountId` that's to be refunded
+     */
+    fn refund_storage(
+        &self, 
+        initial_storage: StorageUsage, 
+        sender_id: AccountId
+    ) {
+        let current_storage = env::storage_usage();
+        let attached_deposit = env::attached_deposit();
+        let refund_amount = if current_storage > initial_storage {
+            let required_deposit =
+                Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
+            assert!(
+                required_deposit <= attached_deposit,
+                "The required attached deposit is {}, but the given attached deposit is is {}",
+                required_deposit,
+                attached_deposit,
+            );
+            attached_deposit - required_deposit
+        } else {
+            attached_deposit
+                + Balance::from(initial_storage - current_storage) * STORAGE_PRICE_PER_BYTE
+        };
+        if refund_amount > 0 {
+            Promise::new(sender_id).transfer(refund_amount);
+        }
+    }
+}
