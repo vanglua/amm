@@ -9,6 +9,14 @@ pub(crate) fn assert_collateral_token(collateral_token: &AccountId) {
     assert_eq!(&env::predecessor_account_id(), collateral_token, "ERR_INVALID_COLLATERAL");
 }
 
+pub(crate) fn assert_self() {
+    assert_eq!(
+        env::predecessor_account_id(),
+        env::current_account_id(),
+        "Method is private"
+    );
+}
+
 /**
  * @returns a converted timestamp from nanoseconds to miliseconds
  */

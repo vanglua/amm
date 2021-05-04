@@ -14,13 +14,14 @@ construct_uint! {
 }
 
 /** core */
-pub mod protocol;
 mod helper;
 mod resolution_escrow;
 mod msg_structs;
 mod pool_factory;
 mod pool;
 mod outcome_token;
+mod oracle;
+pub mod protocol;
 
 /** utils */
 pub mod math;
