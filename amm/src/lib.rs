@@ -30,9 +30,8 @@ mod gov;
 mod fungible_token_receiver;
 mod oracle;
 mod market_creation;
-mod fungible_token;
 mod storage_manager;
-
+mod fungible_token;
 pub mod collateral_whitelist; // pub for integration tests 
 pub mod math; // pub for integration tests
 
@@ -86,7 +85,7 @@ impl AMMContract {
             markets: Vector::new(b"m".to_vec()),
             collateral_whitelist: collateral_whitelist, 
             paused: false,
-            accounts: LookupMap::new(b"a".to_vec()),
+            accounts: LookupMap::new(b"as".to_vec()),
         }
     }
 }
