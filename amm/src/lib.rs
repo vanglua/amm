@@ -27,7 +27,11 @@ mod pool_factory;
 mod msg_structs;
 mod resolution_escrow;
 mod market;
-mod gov; 
+mod gov;
+mod oracle;
+mod market_creation;
+mod storage_manager;
+mod fungible_token;
 pub mod collateral_whitelist; // pub for integration tests 
 pub mod math; // pub for integration tests
 
@@ -50,7 +54,9 @@ pub struct AMMContract {
     gov: AccountId, // The gov of all markets
     markets: Vector<Market>, // Vector containing all markets where the index represents the market id
     collateral_whitelist: Whitelist, // Map a token's account id to number of decimals it's denominated in
-    paused: bool // If true certain functions are no longer callable, settable by `gov`
+    paused: bool, // If true certain functions are no longer callable, settable by `gov`
+    // Storage map
+    pub accounts: LookupMap<AccountId, Balance>,
 }
 
 #[near_bindgen]
@@ -74,7 +80,8 @@ impl AMMContract {
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
             collateral_whitelist: collateral_whitelist, 
-            paused: false
+            paused: false,
+            accounts: LookupMap::new(b"as".to_vec()),
         }
     }
 
@@ -91,8 +98,11 @@ impl AMMContract {
         sender_id: AccountId,
         amount: U128,
         msg: String,
-    ) -> U128 {
+    ) {
         self.assert_unpaused();
+        let initial_storage_usage = env::storage_usage();
+        let initial_user_balance = self.accounts.get(&sender_id).unwrap_or(0);
+
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
 
@@ -101,13 +111,10 @@ impl AMMContract {
         match parsed_msg.function.as_str() {
             "add_liquidity" => self.add_liquidity(&sender_id, amount, parsed_msg.args), 
             "buy" => self.buy(&sender_id, amount, parsed_msg.args),
+            "create_market" => self.ft_create_market_callback(&sender_id, amount, parsed_msg.args, initial_storage_usage, initial_user_balance).into(),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
         };
-
-        0.into()
     }
-
-
 }
 
 /*** Private methods ***/
@@ -131,7 +138,7 @@ impl AMMContract {
         sender: &AccountId,
         total_in: u128,
         args: serde_json::Value,
-    ) {
+    ) -> PromiseOrValue<u8> {
         let parsed_args: msg_structs::AddLiquidity = msg_structs::from_args(args);
         let weights_u128: Option<Vec<u128>> = match parsed_args.weight_indication {
             Some(weight_indication) => {
@@ -155,6 +162,8 @@ impl AMMContract {
             weights_u128
         );
         self.markets.replace(parsed_args.market_id.into(), &market);
+
+        PromiseOrValue::Value(0)
     }
 
 
@@ -169,7 +178,7 @@ impl AMMContract {
         sender: &AccountId,
         collateral_in: u128, 
         args: serde_json::Value,
-    ) {
+    ) -> PromiseOrValue<u8> {
         let parsed_args: msg_structs::Buy = msg_structs::from_args(args);
         let mut market = self.markets.get(parsed_args.market_id.into()).expect("ERR_NO_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
@@ -184,6 +193,8 @@ impl AMMContract {
         );
 
         self.markets.replace(parsed_args.market_id.into(), &market);
+
+        PromiseOrValue::Value(0)
     }
 
     /**

@@ -3,6 +3,7 @@ use near_sdk::{
         U128, 
         U64
     },
+    AccountId,
     serde_json,
     serde_json::Value,
 };
@@ -43,6 +44,22 @@ pub struct Buy {
     pub market_id: U64, // id of the market that shares are to be purchased from
     pub outcome_target: u16, // outcome that the sender buys shares in
     pub min_shares_out: U128 // the minimum amount of share tokens the user expects out, this is to prevent slippage
+}
+
+/**
+ * @notice `create_market` args
+ */
+#[derive(Serialize, Deserialize)]
+pub struct CreateMarket {
+    pub description: String,
+    pub extra_info: String,
+    pub outcomes: u16,
+    pub outcome_tags: Vec<String>,
+    pub categories: Vec<String>,
+    pub end_time: U64,
+    pub collateral_token_id: AccountId,
+    pub swap_fee: U128,
+    pub is_scalar: Option<bool>,
 }
 
 /**
