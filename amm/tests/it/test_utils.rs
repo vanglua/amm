@@ -211,6 +211,17 @@ pub fn storage_deposit(receiver: &str, sender: &UserAccount, deposit: u128, to_r
     assert!(res.is_ok(), "storage deposit failed with res: {:?}", res);
 }
 
+pub fn dr_get_expect(sender: &UserAccount, dr_id: u64) {
+    let res: bool = sender.view(
+        PendingContractTx::new(
+            ORACLE_CONTRACT_ID,
+            "dr_exists",
+            json!({"dr_id": U64(dr_id)}),
+            true
+        )
+    ).unwrap_json();
+}
+
 pub fn near_deposit(sender: &UserAccount, deposit: u128) {
     let res = sender.call(
         PendingContractTx::new(
