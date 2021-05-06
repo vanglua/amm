@@ -30,8 +30,8 @@ mod market;
 mod gov;
 mod oracle;
 mod market_creation;
-mod storage_manager;
 mod fungible_token;
+
 pub mod collateral_whitelist; // pub for integration tests 
 pub mod math; // pub for integration tests
 
@@ -98,7 +98,7 @@ impl AMMContract {
         sender_id: AccountId,
         amount: U128,
         msg: String,
-    ) {
+    ) -> PromiseOrValue<u8> {
         self.assert_unpaused();
         let initial_storage_usage = env::storage_usage();
         let initial_user_balance = self.accounts.get(&sender_id).unwrap_or(0);
@@ -113,7 +113,7 @@ impl AMMContract {
             "buy" => self.buy(&sender_id, amount, parsed_msg.args),
             "create_market" => self.ft_create_market_callback(&sender_id, amount, parsed_msg.args, initial_storage_usage, initial_user_balance).into(),
             _ => panic!("ERR_UNKNOWN_FUNCTION")
-        };
+        }
     }
 }
 
