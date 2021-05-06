@@ -619,7 +619,6 @@ impl Contract {
     }
 }
 
-#[near_bindgen]
 impl Contract {
     fn dr_get_expect(&self, id: U64) -> DataRequest {
         self.data_requests.get(id.into()).expect("DataRequest with this id does not exist")
