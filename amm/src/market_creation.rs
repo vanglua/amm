@@ -141,7 +141,6 @@ impl AMMContract {
         payload: CreateMarketArgs
     ) -> Promise {
         self.assert_unpaused();
-
         let market_id = self.create_market(&payload);
 
         oracle::fetch_oracle_config(&self.oracle)
