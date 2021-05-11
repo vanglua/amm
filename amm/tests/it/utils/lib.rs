@@ -13,7 +13,7 @@ use near_sdk::{
 };
 
 use near_sdk_sim::{
-    // ExecutionResult,
+    ExecutionResult,
     // call,
     // view,
     deploy, 
@@ -29,6 +29,12 @@ mod amm_utils;
 mod account_utils;
 mod oracle_utils;
 mod token_utils;
+mod deposit;
+mod helpers;
+
+pub use account_utils::*;
+pub use deposit::*;
+pub use helpers::*;
 
 extern crate amm;
 pub use amm::*;
@@ -51,52 +57,31 @@ near_sdk_sim::lazy_static! {
 }
 
 pub struct InitRes {
-    pub master_account: UserAccount,
+    pub master_account: TestAccount,
     pub amm_contract: ContractAccount<AMMContract>,
     pub oracle_contract: ContractAccount<OracleContract>,
     pub token_account_id: ContractAccount<TokenContract>,
-    pub alice: UserAccount,
-    pub bob: UserAccount,
-    pub carol: UserAccount
+    pub alice: account_utils::TestAccount,
+    pub bob: account_utils::TestAccount,
+    pub carol: account_utils::TestAccount
 }
 
 
 pub fn init(
     gov_id: AccountId
 ) -> InitRes {
-    let master_account = account_utils::init_account(None, None);
+    let master_account = TestAccount::new(None, None);
     let amm_init_res = amm_utils::AMMUtils::new(&master_account, gov_id.to_string()); // Init amm
     let oracle_init_res = oracle_utils::OracleUtils::new(&master_account, gov_id.to_string());  // Init oracle
     let token_init_res = token_utils::TokenUtils::new(&master_account); // Init token
 
     InitRes {
-        alice: account_utils::init_account(Some(&master_account), Some("alice")),
-        bob: account_utils::init_account(Some(&master_account), Some("bob")),
-        carol: account_utils::init_account(Some(&master_account), Some("carol")),
+        alice: TestAccount::new(Some(&master_account.account), Some("alice")),
+        bob: TestAccount::new(Some(&master_account.account), Some("bob")),
+        carol: TestAccount::new(Some(&master_account.account), Some("carol")),
         master_account: master_account,
         amm_contract: amm_init_res.contract,
         oracle_contract: oracle_init_res.contract,
         token_account_id: token_init_res.contract, // should be doable like oracle and amm
     }
-}
-
-pub fn storage_deposit(
-    receiver: &str, 
-    sender: &UserAccount, 
-    deposit: u128, 
-    to_register: Option<AccountId>
-) {
-    let res = sender.call(
-        PendingContractTx::new(
-            receiver,
-            "storage_deposit",
-            json!({
-                "account_id": to_register
-            }),
-            false
-        ),
-        deposit,
-        DEFAULT_GAS
-    );
-    assert!(res.is_ok(), "storage deposit failed with res: {:?}", res);
 }

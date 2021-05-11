@@ -5,7 +5,7 @@ pub struct AMMUtils {
 }
 
 impl AMMUtils {
-    pub fn new(master_account: &UserAccount, gov_id: AccountId) -> Self {
+    pub fn new(master_account: &TestAccount, gov_id: AccountId) -> Self {
         // deploy amm
         let contract = deploy!(
             // Contract Proxy
@@ -15,7 +15,7 @@ impl AMMUtils {
             // Bytes of contract
             bytes: &AMM_WASM_BYTES,
             // User deploying the contract,
-            signer_account: master_account,
+            signer_account: master_account.account,
             deposit: to_yocto("1000"),
             // init method
             init_method: init(
@@ -24,8 +24,8 @@ impl AMMUtils {
             )
         );
 
-        storage_deposit(TOKEN_CONTRACT_ID, &master_account, SAFE_STORAGE_AMOUNT, Some(AMM_CONTRACT_ID.to_string()));
-        storage_deposit(ORACLE_CONTRACT_ID, &master_account, SAFE_STORAGE_AMOUNT, Some(AMM_CONTRACT_ID.to_string()));
+        storage_deposit(TOKEN_CONTRACT_ID, &master_account.account, SAFE_STORAGE_AMOUNT, Some(AMM_CONTRACT_ID.to_string()));
+        storage_deposit(ORACLE_CONTRACT_ID, &master_account.account, SAFE_STORAGE_AMOUNT, Some(AMM_CONTRACT_ID.to_string()));
 
         Self {
             contract

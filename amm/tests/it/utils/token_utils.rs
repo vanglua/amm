@@ -5,7 +5,7 @@ pub struct TokenUtils {
 }
 
 impl TokenUtils {
-    pub fn new(master_account: &UserAccount) -> Self {
+    pub fn new(master_account: &TestAccount) -> Self {
         // deploy token
         let contract = deploy!(
             // Contract Proxy
@@ -15,7 +15,7 @@ impl TokenUtils {
             // Bytes of contract
             bytes: &TOKEN_WASM_BYTES,
             // User deploying the contract,
-            signer_account: master_account,
+            signer_account: master_account.account,
             deposit: to_yocto("1000"),
             // init method
             init_method: new()

@@ -6,7 +6,7 @@ pub struct OracleUtils {
 }
 
 impl OracleUtils {
-    pub fn new(master_account: &UserAccount, gov_id: AccountId) -> Self {
+    pub fn new(master_account: &TestAccount, gov_id: AccountId) -> Self {
         let config = OracleConfig {
             gov: "alice".to_string(),
             final_arbitrator: "alice".to_string(),
@@ -29,7 +29,7 @@ impl OracleUtils {
             // Bytes of contract
             bytes: &ORACLE_WASM_BYTES,
             // User deploying the contract,
-            signer_account: master_account,
+            signer_account: master_account.account,
             deposit: to_yocto("1000"),
             // init method
             init_method: new(
@@ -42,8 +42,8 @@ impl OracleUtils {
             )
         );
 
-        storage_deposit(TOKEN_CONTRACT_ID, &master_account, SAFE_STORAGE_AMOUNT, Some(ORACLE_CONTRACT_ID.to_string()));
-        storage_deposit(ORACLE_CONTRACT_ID, &master_account, SAFE_STORAGE_AMOUNT, Some(ORACLE_CONTRACT_ID.to_string()));
+        storage_deposit(TOKEN_CONTRACT_ID, &master_account.account, SAFE_STORAGE_AMOUNT, Some(ORACLE_CONTRACT_ID.to_string()));
+        storage_deposit(ORACLE_CONTRACT_ID, &master_account.account, SAFE_STORAGE_AMOUNT, Some(ORACLE_CONTRACT_ID.to_string()));
 
         Self {
             contract
