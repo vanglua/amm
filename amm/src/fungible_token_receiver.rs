@@ -76,3 +76,135 @@ impl FungibleTokenReceiver for AMMContract {
         0.into()
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod mock_token_basic_tests {
+    use super::*;
+    use std::convert::TryInto;
+
+    use near_sdk::{ MockedBlockchain };
+    use near_sdk::{ testing_env, VMContext };
+    use crate::storage_manager::StorageManager;
+
+    fn alice() -> AccountId {
+        "alice.near".to_string()
+    }
+
+    fn bob() -> AccountId {
+        "bob.near".to_string()
+    }
+
+    fn token() -> AccountId {
+        "token.near".to_string()
+    }
+
+    fn empty_string() -> String {
+        "".to_string()
+    }
+
+    fn empty_string_vec(len: u16) -> Vec<String> {
+        let mut tags: Vec<String> = vec![];
+        for i in 0..len {
+            tags.push(empty_string());
+        }
+        tags
+    }
+
+    fn to_valid(account: AccountId) -> ValidAccountId {
+        account.try_into().expect("invalid account")
+    }
+
+    fn get_context(predecessor_account_id: AccountId) -> VMContext {
+        VMContext {
+            current_account_id: token(),
+            signer_account_id: bob(),
+            signer_account_pk: vec![0, 1, 2],
+            predecessor_account_id,
+            input: vec![],
+            block_index: 0,
+            block_timestamp: 0,
+            account_balance: 1000 * 10u128.pow(24),
+            account_locked_balance: 0,
+            storage_usage: 10u64.pow(6),
+            attached_deposit: 1000 * 10u128.pow(24),
+            prepaid_gas: 10u64.pow(18),
+            random_seed: vec![0, 1, 2],
+            is_view: false,
+            output_data_receivers: vec![],
+            epoch_height: 0,
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "attempt to subtract with overflow")]
+    fn transfer_storage_no_funds() {
+        testing_env!(get_context(token()));
+        let mut contract = AMMContract::init(
+            bob().try_into().unwrap(),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}]
+        );
+
+        contract.create_market(
+            empty_string(), // market description
+            empty_string(), // extra info
+            2, // outcomes
+            empty_string_vec(2), // outcome tags
+            empty_string_vec(2), // categories
+            1609951265967.into(), // end_time
+            1619882574000.into(), // resolution_time (~1 day after end_time)
+            token(), // collateral_token_id
+            (10_u128.pow(24) / 50).into(), // swap fee, 2%
+            None // is_scalar
+        );
+
+        let msg = serde_json::json!({
+            "AddLiquidityArgs": {
+                "market_id": "0",
+                "weight_indication": Some(vec![U128(2), U128(1)])
+            }
+        });
+        contract.ft_on_transfer(alice(), U128(10000000000000000000), msg.to_string());
+    }
+
+    #[test]
+    fn transfer_storage_funds() {
+        testing_env!(get_context(token()));
+        let mut contract = AMMContract::init(
+            bob().try_into().unwrap(),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}]
+        );
+
+        contract.create_market(
+            empty_string(), // market description
+            empty_string(), // extra info
+            2, // outcomes
+            empty_string_vec(2), // outcome tags
+            empty_string_vec(2), // categories
+            1609951265967.into(), // end_time
+            1619882574000.into(), // resolution_time (~1 day after end_time)
+            token(), // collateral_token_id
+            (10_u128.pow(24) / 50).into(), // swap fee, 2%
+            None // is_scalar
+        );
+
+        let storage_start = 10u128.pow(24);
+
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = storage_start;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
+
+        testing_env!(get_context(token()));
+        let msg = serde_json::json!({
+            "AddLiquidityArgs": {
+                "market_id": "0",
+                "weight_indication": Some(vec![U128(2), U128(1)])
+            }
+        });
+        contract.ft_on_transfer(alice(), U128(10000000000000000000), msg.to_string());
+
+        let b = contract.accounts.get(&alice());
+        assert!(b.unwrap() < storage_start);
+    }
+}
