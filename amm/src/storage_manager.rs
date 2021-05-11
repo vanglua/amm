@@ -97,7 +97,7 @@ mod mock_token_basic_tests {
     use std::convert::TryInto;
     use near_sdk::{ MockedBlockchain };
     use near_sdk::{ testing_env, VMContext };
-
+    use collateral_whitelist::Token;
 
     fn alice() -> AccountId {
         "alice.near".to_string()
@@ -148,86 +148,95 @@ mod mock_token_basic_tests {
         }
     }
 
-    // #[test]
-    // fn storage_manager_deposit() {
-    //     testing_env!(get_context(token()));
-    //     let whitelist = Some(vec![to_valid(bob()), to_valid(carol())]);
-    //     let mut contract = Contract::new(whitelist, config());
+    #[test]
+    fn storage_manager_deposit() {
+        testing_env!(get_context(token()));
 
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, 0);
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}]
+        );
 
-    //     let amount = 10u128.pow(24);
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, 0);
 
-    //     //deposit
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = amount;
-    //     testing_env!(c);
-    //     contract.storage_deposit(Some(to_valid(alice())));
+        let amount = 10u128.pow(24);
 
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, amount);
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-    //     //deposit again
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = amount;
-    //     testing_env!(c);
-    //     contract.storage_deposit(Some(to_valid(alice())));
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, amount);
 
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, amount*2);
-    // }
+        //deposit again
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-    // #[test]
-    // fn storage_manager_withdraw() {
-    //     testing_env!(get_context(token()));
-    //     let whitelist = Some(vec![to_valid(bob()), to_valid(carol())]);
-    //     let mut contract = Contract::new(whitelist, config());
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, amount*2);
+    }
 
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, 0);
+    #[test]
+    fn storage_manager_withdraw() {
+        testing_env!(get_context(token()));
 
-    //     let amount = 10u128.pow(24);
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}]
+        );
 
-    //     //deposit
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = amount;
-    //     testing_env!(c);
-    //     contract.storage_deposit(Some(to_valid(alice())));
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, 0);
 
-    //     // withdraw
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = 1;
-    //     testing_env!(c);
+        let amount = 10u128.pow(24);
 
-    //     contract.storage_withdraw(U128(amount/2));
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, amount/2);
-    // }
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-    // #[test]
-    // #[should_panic(expected = "attempt to subtract with overflow")]
-    // fn storage_manager_withdraw_too_much() {
-    //     testing_env!(get_context(token()));
-    //     let whitelist = Some(vec![to_valid(bob()), to_valid(carol())]);
-    //     let mut contract = Contract::new(whitelist, config());
+        // withdraw
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = 1;
+        testing_env!(c);
 
-    //     let balance = contract.accounts.get(&alice()).unwrap_or(0);
-    //     assert_eq!(balance, 0);
+        contract.storage_withdraw(U128(amount/2));
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, amount/2);
+    }
 
-    //     let amount = 10u128.pow(24);
+    #[test]
+    #[should_panic(expected = "attempt to subtract with overflow")]
+    fn storage_manager_withdraw_too_much() {
+        testing_env!(get_context(token()));
 
-    //     //deposit
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = amount;
-    //     testing_env!(c);
-    //     contract.storage_deposit(Some(to_valid(alice())));
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}]
+        );
 
-    //     // withdraw
-    //     let mut c : VMContext = get_context(alice());
-    //     c.attached_deposit = 1;
-    //     testing_env!(c);
+        let balance = contract.accounts.get(&alice()).unwrap_or(0);
+        assert_eq!(balance, 0);
 
-    //     contract.storage_withdraw(U128(amount*2));
-    // }
+        let amount = 10u128.pow(24);
+
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
+
+        // withdraw
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = 1;
+        testing_env!(c);
+
+        contract.storage_withdraw(U128(amount*2));
+    }
 }
