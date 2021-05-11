@@ -2,6 +2,7 @@ use crate::*;
 use near_sdk::serde::{ Serialize, Deserialize };
 use near_sdk::serde_json;
 use crate::types::{ WrappedBalance };
+use storage_manager::{ STORAGE_PRICE_PER_BYTE };
 
 /**
  * @notice `add_liquidity` args
@@ -50,14 +51,27 @@ impl FungibleTokenReceiver for AMMContract {
         msg: String,
     ) -> WrappedBalance {
         self.assert_unpaused();
+
         let amount: u128 = amount.into();
         assert!(amount > 0, "ERR_ZERO_AMOUNT");
-        let payload: Payload =  serde_json::from_str(&msg).expect("Failed to parse the payload, invalid `msg` format");
+        let initial_storage_usage = env::storage_usage();
+        let initial_user_balance = self.accounts.get(&sender_id).unwrap_or(0);
 
-        match payload{
+        let payload: Payload = serde_json::from_str(&msg).expect("Failed to parse the payload, invalid `msg` format");
+        match payload {
             Payload::BuyArgs(payload) => self.buy(&sender_id, amount, payload), 
             Payload::AddLiquidityArgs(payload) => self.add_liquidity(&sender_id, amount, payload)
         };
+
+        if env::storage_usage() >= initial_storage_usage {
+            // used more storage, deduct from balance
+            let difference : u128 = u128::from(env::storage_usage() - initial_storage_usage);
+            self.accounts.insert(&sender_id, &(initial_user_balance - difference * STORAGE_PRICE_PER_BYTE));
+        } else {
+            // freed up storage, add to balance
+            let difference : u128 = u128::from(initial_storage_usage - env::storage_usage());
+            self.accounts.insert(&sender_id, &(initial_user_balance + difference * STORAGE_PRICE_PER_BYTE));
+        }
 
         0.into()
     }
