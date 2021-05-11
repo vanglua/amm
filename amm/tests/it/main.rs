@@ -1,5 +1,7 @@
 // mod init_tests;
-mod test_utils;
+
+#[path = "utils/lib.rs"]
+mod utils;
 
 // mod claim_scenario;
 // mod fee_tests;
@@ -9,3 +11,4 @@ mod pool_initiation_tests;
 // mod pricing_tests;
 // mod swap_tests;
 // mod uneven_lp_shares_solvency_tests;
+

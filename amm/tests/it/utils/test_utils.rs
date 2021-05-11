@@ -26,7 +26,6 @@ use near_sdk_sim::{
 };
 
 extern crate amm;
-
 pub use amm::*;
 
 use oracle::{oracle_config::OracleConfig, ContractContract};
@@ -121,29 +120,21 @@ pub fn init(
         // init method
         init_method: new(Some(vec!["amm".to_string().try_into().expect("invalid acc id"), "alice".to_string().try_into().expect("invalid acc id")]), config)
     );
-
-    let ft_storage_amount = get_storage_amount(&master_account);
-    let oracle_storage_amount = 180000000000000000000000_u128;
-    storage_deposit(TOKEN_CONTRACT_ID, &master_account, ft_storage_amount.into(), Some(AMM_CONTRACT_ID.to_string()));
-    storage_deposit(ORACLE_CONTRACT_ID, &master_account, oracle_storage_amount, Some(AMM_CONTRACT_ID.to_string()));
-    storage_deposit(TOKEN_CONTRACT_ID, &master_account, ft_storage_amount.into(), Some(ORACLE_CONTRACT_ID.to_string()));
-    storage_deposit(ORACLE_CONTRACT_ID, &master_account, oracle_storage_amount, Some(ORACLE_CONTRACT_ID.to_string()));
     
     let alice = master_account.create_user("alice".to_string(), to_yocto("10000"));
-
-    storage_deposit(TOKEN_CONTRACT_ID, &alice, ft_storage_amount.into(), None);
-    storage_deposit(ORACLE_CONTRACT_ID, &alice, oracle_storage_amount, None);
+    storage_deposit(TOKEN_CONTRACT_ID, &alice, SAFE_STORAGE_AMOUNT, None);
+    storage_deposit(ORACLE_CONTRACT_ID, &alice, SAFE_STORAGE_AMOUNT, None);
     near_deposit(&alice, init_balance());
     let bob = master_account.create_user("bob".to_string(), to_yocto("10000"));
 
-    storage_deposit(TOKEN_CONTRACT_ID, &bob, ft_storage_amount.into(), None);
-    storage_deposit(ORACLE_CONTRACT_ID, &bob, oracle_storage_amount, None);
+    storage_deposit(TOKEN_CONTRACT_ID, &bob, SAFE_STORAGE_AMOUNT, None);
+    storage_deposit(ORACLE_CONTRACT_ID, &bob, SAFE_STORAGE_AMOUNT, None);
     near_deposit(&bob, init_balance());
 
     let carol = master_account.create_user("carol".to_string(), to_yocto("10000"));
 
-    storage_deposit(TOKEN_CONTRACT_ID, &carol, ft_storage_amount.into(), None);
-    storage_deposit(ORACLE_CONTRACT_ID, &carol, oracle_storage_amount, None);
+    storage_deposit(TOKEN_CONTRACT_ID, &carol, SAFE_STORAGE_AMOUNT, None);
+    storage_deposit(ORACLE_CONTRACT_ID, &carol, SAFE_STORAGE_AMOUNT, None);
     near_deposit(&carol, init_balance());
 
     InitRes {
