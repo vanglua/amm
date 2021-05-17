@@ -97,9 +97,8 @@ impl StorageManager for AMMContract {
 mod mock_token_basic_tests {
     use super::*;
     use std::convert::TryInto;
-    use near_sdk::{ MockedBlockchain };
+    use near_sdk::MockedBlockchain;
     use near_sdk::{ testing_env, VMContext };
-    use collateral_whitelist::Token;
 
     fn alice() -> AccountId {
         "alice.near".to_string()
@@ -109,20 +108,12 @@ mod mock_token_basic_tests {
         "bob.near".to_string()
     }
 
-    fn carol() -> AccountId {
-        "carol.near".to_string()
-    }
-
     fn token() -> AccountId {
         "token.near".to_string()
     }
 
     fn _target() -> AccountId {
         "target.near".to_string()
-    }
-
-    fn gov() -> AccountId {
-        "gov.near".to_string()
     }
 
     fn to_valid(account: AccountId) -> ValidAccountId {
