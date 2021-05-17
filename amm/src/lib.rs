@@ -23,7 +23,6 @@ mod pool;
 mod logger;
 
 mod outcome_token;
-mod pool_factory;
 mod resolution_escrow;
 mod market;
 mod gov; 

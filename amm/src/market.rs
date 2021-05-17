@@ -185,11 +185,11 @@ impl AMMContract {
         assert!(resolution_time >= end_time, "ERR_INVALID_RESOLUTION_TIME");
         let initial_storage = env::storage_usage();
 
-        let pool = pool_factory::new_pool(
+        let pool = Pool::new(
             market_id,
-            outcomes,
             collateral_token_id,
             token_decimals.unwrap(),
+            outcomes,
             swap_fee
         );
 
