@@ -37,8 +37,8 @@ impl Pool {
         outcomes: u16,
         swap_fee: Balance
     ) -> Self {
-        assert!(outcomes >= constants::MIN_OUTCOMES, "ERR_MIN_OUTCOMES");
-        assert!(outcomes <= constants::MAX_OUTCOMES, "ERR_MAX_OUTCOMES");
+        assert!(outcomes >= MIN_OUTCOMES, "ERR_MIN_OUTCOMES");
+        assert!(outcomes <= MAX_OUTCOMES, "ERR_MAX_OUTCOMES");
         let collateral_denomination = 10_u128.pow(collateral_decimals);
         assert!(swap_fee == 0 || (swap_fee <= collateral_denomination / 20 && swap_fee >= collateral_denomination / 10_000), "ERR_INVALID_FEE");
 

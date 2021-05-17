@@ -21,7 +21,7 @@ mod types;
 mod helper;
 mod pool;
 mod logger;
-mod constants;
+
 mod outcome_token;
 mod pool_factory;
 mod resolution_escrow;
@@ -40,6 +40,9 @@ use crate::collateral_whitelist::Whitelist;
 
 const GAS_BASE_COMPUTE: Gas = 5_000_000_000_000;
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+
+pub const MIN_OUTCOMES: u16 = 2; // Minimum number of outcomes a market must have in order to be valid
+pub const MAX_OUTCOMES: u16 = 8; // Minimum number of outcomes a market can have in order to be valid
 
 #[ext_contract]
 pub trait CollateralToken {
