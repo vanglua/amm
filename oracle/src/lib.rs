@@ -10,7 +10,7 @@ near_sdk::setup_alloc!();
 mod types;
 pub mod data_request;
 mod fungible_token_receiver;
-mod callback_args;
+pub mod callback_args;
 mod whitelist;
 pub mod oracle_config;
 mod storage_manager;
