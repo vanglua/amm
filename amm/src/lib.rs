@@ -27,7 +27,7 @@ mod pool_factory;
 mod resolution_escrow;
 mod market;
 mod gov; 
-mod fungible_token_receiver;
+pub mod fungible_token_receiver;
 mod oracle;
 mod market_creation;
 mod fungible_token;

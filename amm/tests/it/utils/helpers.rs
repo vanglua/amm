@@ -30,3 +30,7 @@ pub fn env_time() -> U64{
 pub fn fee() -> U128 {
     (10_u128.pow(24) / 50).into() // 2%
 }
+
+pub fn transfer_call_storage_amount() -> u128 {
+    1
+}

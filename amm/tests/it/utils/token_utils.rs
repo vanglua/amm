@@ -20,6 +20,7 @@ impl TokenUtils {
             // init method
             init_method: new()
         );
+
         Self {
             contract
         }

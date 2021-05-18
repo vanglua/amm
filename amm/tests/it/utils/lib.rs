@@ -14,14 +14,14 @@ use near_sdk::{
 
 use near_sdk_sim::{
     ExecutionResult,
-    // call,
-    // view,
+    call,
+    view,
     deploy, 
     init_simulator, 
     to_yocto, 
     ContractAccount, 
     UserAccount, 
-    // STORAGE_AMOUNT,
+    STORAGE_AMOUNT,
     DEFAULT_GAS
 };
 
@@ -35,7 +35,7 @@ mod helpers;
 pub use account_utils::*;
 pub use deposit::*;
 pub use helpers::*;
-
+pub use oracle::callback_args::NewDataRequestArgs;
 extern crate amm;
 pub use amm::*;
 
@@ -43,11 +43,10 @@ type OracleContract = oracle::ContractContract;
 type TokenContract = token::TokenContractContract;
 type AMMContract = amm::AMMContractContract;
 
-pub const REGISTRY_STORAGE: u128 = 8_300_000_000_000_000_000_000;
 pub const TOKEN_CONTRACT_ID: &str = "token";
 pub const AMM_CONTRACT_ID: &str = "amm";
 pub const ORACLE_CONTRACT_ID: &str = "oracle";
-pub const SAFE_STORAGE_AMOUNT: u128 = 180000000000000000000000;
+pub const SAFE_STORAGE_AMOUNT: u128 = 1250000000000000000000;
 
 // Load in contract bytes
 near_sdk_sim::lazy_static! {
@@ -56,32 +55,34 @@ near_sdk_sim::lazy_static! {
     static ref TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../../../../res/token.wasm").as_ref();
 }
 
-pub struct InitRes {
+pub struct TestUtils {
     pub master_account: TestAccount,
     pub amm_contract: ContractAccount<AMMContract>,
     pub oracle_contract: ContractAccount<OracleContract>,
-    pub token_account_id: ContractAccount<TokenContract>,
+    pub token_contract: ContractAccount<TokenContract>,
     pub alice: account_utils::TestAccount,
     pub bob: account_utils::TestAccount,
     pub carol: account_utils::TestAccount
 }
 
-
-pub fn init(
-    gov_id: AccountId
-) -> InitRes {
-    let master_account = TestAccount::new(None, None);
-    let amm_init_res = amm_utils::AMMUtils::new(&master_account, gov_id.to_string()); // Init amm
-    let oracle_init_res = oracle_utils::OracleUtils::new(&master_account, gov_id.to_string());  // Init oracle
-    let token_init_res = token_utils::TokenUtils::new(&master_account); // Init token
-
-    InitRes {
-        alice: TestAccount::new(Some(&master_account.account), Some("alice")),
-        bob: TestAccount::new(Some(&master_account.account), Some("bob")),
-        carol: TestAccount::new(Some(&master_account.account), Some("carol")),
-        master_account: master_account,
-        amm_contract: amm_init_res.contract,
-        oracle_contract: oracle_init_res.contract,
-        token_account_id: token_init_res.contract, // should be doable like oracle and amm
+impl TestUtils {
+    pub fn init(
+        gov_id: AccountId
+    ) -> Self {
+        let master_account = TestAccount::new(None, None);
+        let token_init_res = token_utils::TokenUtils::new(&master_account); // Init token
+        let oracle_init_res = oracle_utils::OracleUtils::new(&master_account, gov_id.to_string());  // Init oracle
+        let amm_init_res = amm_utils::AMMUtils::new(&master_account, gov_id.to_string()); // Init amm
+    
+        Self {
+            alice: TestAccount::new(Some(&master_account.account), Some("alice")),
+            bob: TestAccount::new(Some(&master_account.account), Some("bob")),
+            carol: TestAccount::new(Some(&master_account.account), Some("carol")),
+            master_account: master_account,
+            amm_contract: amm_init_res.contract,
+            oracle_contract: oracle_init_res.contract,
+            token_contract: token_init_res.contract, // should be doable like oracle and amm
+        }
     }
 }
+
