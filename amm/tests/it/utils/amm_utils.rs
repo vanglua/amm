@@ -20,7 +20,8 @@ impl AMMUtils {
             // init method
             init_method: init(
                 gov_id.try_into().unwrap(),
-                vec![amm::collateral_whitelist::Token{account_id: "token".to_string(), decimals: 24}]
+                vec![amm::collateral_whitelist::Token{account_id: "token".to_string(), decimals: 24}],
+                ORACLE_CONTRACT_ID.try_into().expect("invalid account id")
             )
         );
 

@@ -66,9 +66,10 @@ impl TestAccount {
                 AMM_CONTRACT_ID, 
                 "proceed_market_creation", 
                 json!({
+                    "sender": self.account.account_id(),
                     "bond_token": TOKEN_CONTRACT_ID, 
-                    "bond_in": 100, 
-                    "payload": fungible_token_receiver::CreateMarketArgs {
+                    "bond_in": U128(100), 
+                    "market_args": fungible_token_receiver::CreateMarketArgs {
                         description: empty_string(),
                         extra_info: empty_string(),
                         outcomes: 2,

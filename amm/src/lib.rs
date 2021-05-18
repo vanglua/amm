@@ -2,7 +2,9 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{U128, U64, ValidAccountId};
 use near_sdk::collections::{Vector, UnorderedMap, LookupMap};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
+    serde_json,
     PromiseOrValue,
     Balance,
     StorageUsage,
@@ -31,6 +33,7 @@ pub mod fungible_token_receiver;
 mod oracle;
 mod market_creation;
 mod fungible_token;
+mod storage_manager;
 
 pub mod collateral_whitelist; // pub for integration tests 
 pub mod math; // pub for integration tests

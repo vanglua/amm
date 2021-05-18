@@ -554,32 +554,32 @@ mod market_basic_tests {
         );
     }
 
-    #[test]
-    #[should_panic(expected = "ERR_INVALID_RESOLUTION_TIME")]
-    fn invalid_resolution_time() {
-        testing_env!(get_context(alice(), 0));
+    // #[test]
+    // #[should_panic(expected = "ERR_INVALID_RESOLUTION_TIME")]
+    // fn invalid_resolution_time() {
+    //     testing_env!(get_context(alice(), 0));
 
-        let mut contract = AMMContract::init(
-            bob().try_into().unwrap(),
-            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
-            oracle().try_into().unwrap()
-        );
+    //     let mut contract = AMMContract::init(
+    //         bob().try_into().unwrap(),
+    //         vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
+    //         oracle().try_into().unwrap()
+    //     );
 
-        let market_id = contract.create_market(
-            CreateMarketArgs {
-                description: empty_string(), // market description
-                extra_info: empty_string(), // extra info
-                outcomes: 2, // outcomes
-                outcome_tags: empty_string_vec(2), // outcome tags
-                categories: empty_string_vec(2), // categories
-                end_time: 1609951265967.into(), // end_time
-                resolution_time: 1609951265965.into(), // resolution_time (~1 day after end_time)
-                collateral_token_id: token(), // collateral_token_id
-                swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
-            }
-        );
-    }
+    //     let market_id = contract.create_market(
+    //         CreateMarketArgs {
+    //             description: empty_string(), // market description
+    //             extra_info: empty_string(), // extra info
+    //             outcomes: 2, // outcomes
+    //             outcome_tags: empty_string_vec(2), // outcome tags
+    //             categories: empty_string_vec(2), // categories
+    //             end_time: 1609951265967.into(), // end_time
+    //             resolution_time: 1609951265965.into(), // resolution_time (~1 day after end_time)
+    //             collateral_token_id: token(), // collateral_token_id
+    //             swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
+    //             is_scalar: None // is_scalar
+    //         }
+    //     );
+    // }
 
     #[test]
     #[should_panic(expected = "ERR_RESOLUTION_TIME_NOT_REACHED")]
