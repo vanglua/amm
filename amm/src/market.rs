@@ -499,7 +499,7 @@ mod market_basic_tests {
         );
 
         contract.create_market(
-            CreateMarketArgs {
+            &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
                 outcomes: 2, // outcomes
@@ -526,7 +526,7 @@ mod market_basic_tests {
         );
 
         let market_id = contract.create_market(
-            CreateMarketArgs {
+            &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
                 outcomes: 2, // outcomes
@@ -566,7 +566,7 @@ mod market_basic_tests {
         );
 
         let market_id = contract.create_market(
-            CreateMarketArgs {
+            &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
                 outcomes: 2, // outcomes
@@ -593,7 +593,7 @@ mod market_basic_tests {
         );
 
         let market_id = contract.create_market(
-            CreateMarketArgs {
+            &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
                 outcomes: 2, // outcomes
@@ -639,7 +639,7 @@ mod market_basic_tests {
         );
 
         let market_id = contract.create_market(
-            CreateMarketArgs {
+            &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
                 outcomes: 2, // outcomes

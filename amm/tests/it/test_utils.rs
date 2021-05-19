@@ -75,7 +75,8 @@ pub fn init(
         // init method
         init_method: init(
             gov_id.try_into().unwrap(),
-            vec![amm::collateral_whitelist::Token{account_id: "token".to_string(), decimals: 24}]
+            vec![amm::collateral_whitelist::Token{account_id: "token".to_string(), decimals: 24}],
+            ORACLE_CONTRACT_ID.to_string().try_into().unwrap()
         )
     );
 
