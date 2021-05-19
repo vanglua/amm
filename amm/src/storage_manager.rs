@@ -132,163 +132,163 @@ impl AMMContract {
     }
 }
 
-// #[cfg(not(target_arch = "wasm32"))]
-// #[cfg(test)]
-// mod mock_token_basic_tests {
-//     use super::*;
-//     use std::convert::TryInto;
-//     use near_sdk::{ MockedBlockchain };
-//     use near_sdk::{ testing_env, VMContext };
-//     use collateral_whitelist::Token;
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod mock_token_basic_tests {
+    use super::*;
+    use std::convert::TryInto;
+    use near_sdk::{ MockedBlockchain };
+    use near_sdk::{ testing_env, VMContext };
+    use collateral_whitelist::Token;
 
-//     fn alice() -> AccountId {
-//         "alice.near".to_string()
-//     }
+    fn alice() -> AccountId {
+        "alice.near".to_string()
+    }
 
-//     fn bob() -> AccountId {
-//         "bob.near".to_string()
-//     }
+    fn bob() -> AccountId {
+        "bob.near".to_string()
+    }
 
-//     fn carol() -> AccountId {
-//         "carol.near".to_string()
-//     }
+    fn carol() -> AccountId {
+        "carol.near".to_string()
+    }
 
-//     fn token() -> AccountId {
-//         "token.near".to_string()
-//     }
+    fn token() -> AccountId {
+        "token.near".to_string()
+    }
 
-//     fn oracle() -> AccountId {
-//         "oracle.near".to_string()
-//     }
+    fn oracle() -> AccountId {
+        "oracle.near".to_string()
+    }
 
-//     fn _target() -> AccountId {
-//         "target.near".to_string()
-//     }
+    fn _target() -> AccountId {
+        "target.near".to_string()
+    }
 
-//     fn gov() -> AccountId {
-//         "gov.near".to_string()
-//     }
+    fn gov() -> AccountId {
+        "gov.near".to_string()
+    }
 
-//     fn to_valid(account: AccountId) -> ValidAccountId {
-//         account.try_into().expect("invalid account")
-//     }
+    fn to_valid(account: AccountId) -> ValidAccountId {
+        account.try_into().expect("invalid account")
+    }
 
-//     fn get_context(predecessor_account_id: AccountId) -> VMContext {
-//         VMContext {
-//             current_account_id: token(),
-//             signer_account_id: bob(),
-//             signer_account_pk: vec![0, 1, 2],
-//             predecessor_account_id,
-//             input: vec![],
-//             block_index: 0,
-//             block_timestamp: 0,
-//             account_balance: 1000 * 10u128.pow(24),
-//             account_locked_balance: 0,
-//             storage_usage: 10u64.pow(6),
-//             attached_deposit: 1000 * 10u128.pow(24),
-//             prepaid_gas: 10u64.pow(18),
-//             random_seed: vec![0, 1, 2],
-//             is_view: false,
-//             output_data_receivers: vec![],
-//             epoch_height: 0,
-//         }
-//     }
+    fn get_context(predecessor_account_id: AccountId) -> VMContext {
+        VMContext {
+            current_account_id: token(),
+            signer_account_id: bob(),
+            signer_account_pk: vec![0, 1, 2],
+            predecessor_account_id,
+            input: vec![],
+            block_index: 0,
+            block_timestamp: 0,
+            account_balance: 1000 * 10u128.pow(24),
+            account_locked_balance: 0,
+            storage_usage: 10u64.pow(6),
+            attached_deposit: 1000 * 10u128.pow(24),
+            prepaid_gas: 10u64.pow(18),
+            random_seed: vec![0, 1, 2],
+            is_view: false,
+            output_data_receivers: vec![],
+            epoch_height: 0,
+        }
+    }
 
-//     #[test]
-//     fn storage_manager_deposit() {
-//         testing_env!(get_context(token()));
+    #[test]
+    fn storage_manager_deposit() {
+        testing_env!(get_context(token()));
 
-//         let mut contract = AMMContract::init(
-//             to_valid(bob()),
-//             vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
-//             oracle().try_into().unwrap()
-//         );
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
+            oracle().try_into().unwrap()
+        );
 
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
-//         assert_eq!(balance, 0);
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
+        assert_eq!(account.available, 0);
 
-//         let amount = 10u128.pow(24);
+        let amount = 10u128.pow(24);
 
-//         //deposit
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = amount;
-//         testing_env!(c);
-//         contract.storage_deposit(Some(to_valid(alice())));
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
-//         assert_eq!(balance, amount);
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
+        assert_eq!(account.available, amount);
 
-//         //deposit again
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = amount;
-//         testing_env!(c);
-//         contract.storage_deposit(Some(to_valid(alice())));
+        //deposit again
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
-//         assert_eq!(balance, amount*2);
-//     }
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
+        assert_eq!(account.available, amount*2);
+    }
 
-//     #[test]
-//     fn storage_manager_withdraw() {
-//         testing_env!(get_context(token()));
+    #[test]
+    fn storage_manager_withdraw() {
+        testing_env!(get_context(token()));
 
-//         let mut contract = AMMContract::init(
-//             to_valid(bob()),
-//             vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
-//             oracle().try_into().unwrap()
-//         );
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
+            oracle().try_into().unwrap()
+        );
 
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance {
-//             total: 0,
-//             available: 0,
-//         });
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance {
+            total: 0,
+            available: 0,
+        });
 
-//         assert_eq!(balance, 0);
-//         let amount = 10u128.pow(24);
+        assert_eq!(account.available, 0);
+        let amount = 10u128.pow(24);
 
-//         //deposit
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = amount;
-//         testing_env!(c);
-//         contract.storage_deposit(Some(to_valid(alice())));
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-//         // withdraw
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = 1;
-//         testing_env!(c);
+        // withdraw
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = 1;
+        testing_env!(c);
 
-//         contract.storage_withdraw(U128(amount/2));
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
-//         assert_eq!(balance, amount/2);
-//     }
+        contract.storage_withdraw(U128(amount/2));
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
+        assert_eq!(account.available, amount/2);
+    }
 
-//     #[test]
-//     #[should_panic(expected = "attempt to subtract with overflow")]
-//     fn storage_manager_withdraw_too_much() {
-//         testing_env!(get_context(token()));
+    #[test]
+    #[should_panic(expected = "attempt to subtract with overflow")]
+    fn storage_manager_withdraw_too_much() {
+        testing_env!(get_context(token()));
 
-//         let mut contract = AMMContract::init(
-//             to_valid(bob()),
-//             vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
-//             oracle().try_into().unwrap()
-//         );
+        let mut contract = AMMContract::init(
+            to_valid(bob()),
+            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
+            oracle().try_into().unwrap()
+        );
 
-//         let balance = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
-//         assert_eq!(balance, 0);
+        let account = contract.accounts.get(&alice()).unwrap_or(AccountStorageBalance { total: 0, available: 0 });
+        assert_eq!(account.available, 0);
 
-//         let amount = 10u128.pow(24);
+        let amount = 10u128.pow(24);
 
-//         //deposit
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = amount;
-//         testing_env!(c);
-//         contract.storage_deposit(Some(to_valid(alice())));
+        //deposit
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = amount;
+        testing_env!(c);
+        contract.storage_deposit(Some(to_valid(alice())));
 
-//         // withdraw
-//         let mut c : VMContext = get_context(alice());
-//         c.attached_deposit = 1;
-//         testing_env!(c);
+        // withdraw
+        let mut c : VMContext = get_context(alice());
+        c.attached_deposit = 1;
+        testing_env!(c);
 
-//         contract.storage_withdraw(U128(amount*2));
-//     }
-// }
+        contract.storage_withdraw(U128(amount*2));
+    }
+}
