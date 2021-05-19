@@ -33,7 +33,7 @@ impl AMMContract {
             },
             PromiseResult::Failed => panic!("ERR_FAILED_ORACLE_CONFIG_FETCH"),
         };
-
+        
         let validity_bond: u128 = oracle_config.validity_bond.into();
         let bond_in: u128 = bond_in.into();
 

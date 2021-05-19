@@ -33,6 +33,7 @@ pub (crate) fn ns_to_ms(ns_timestamp: u64) -> u64 {
 pub (crate) fn ms_to_ns(ms_timestamp: u64) -> u64 {
     ms_timestamp * 1_000_000
 }
+
 pub(crate) fn is_promise_success() -> bool {
     assert_eq!(
         env::promise_results_count(),

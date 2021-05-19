@@ -18,7 +18,7 @@ impl TestAccount {
                 let account = master_account.create_user(account_id.expect("expected account id").to_string(), init_balance());
                 storage_deposit(TOKEN_CONTRACT_ID, &account, SAFE_STORAGE_AMOUNT, None);
                 storage_deposit(ORACLE_CONTRACT_ID, &account, SAFE_STORAGE_AMOUNT, None);
-                near_deposit(&account, init_balance() * 9 / 10);
+                near_deposit(&account, init_balance() * 5 / 10);
                 Self {
                     account
                 }
@@ -45,68 +45,19 @@ impl TestAccount {
         self.ft_transfer_call(AMM_CONTRACT_ID.to_string(), to_yocto("100"), msg)
     }
 
-    pub fn dr_new(&self) -> ExecutionResult {
-        let msg = json!({
-            "CreateMarketArgs": {
-                "description": empty_string(),
-                "extra_info": empty_string(),
-                "outcomes": 2,
-                "outcome_tags": empty_string_vec(2),
-                "categories": empty_string_vec(2),
-                "end_time": env_time(),
-                "resolution_time": env_time(),
-                "collateral_token_id": TOKEN_CONTRACT_ID,
-                "swap_fee": "0",
-                "is_scalar": false
-            }
-        }).to_string();
-
-        let res = self.account.call(
-            PendingContractTx::new(
-                AMM_CONTRACT_ID, 
-                "proceed_market_creation", 
-                json!({
-                    "sender": self.account.account_id(),
-                    "bond_token": TOKEN_CONTRACT_ID, 
-                    "bond_in": U128(100), 
-                    "market_args": fungible_token_receiver::CreateMarketArgs {
-                        description: empty_string(),
-                        extra_info: empty_string(),
-                        outcomes: 2,
-                        outcome_tags: empty_string_vec(2),
-                        categories: empty_string_vec(2),
-                        end_time: env_time(),
-                        resolution_time: env_time(),
-                        collateral_token_id: TOKEN_CONTRACT_ID.to_string(),
-                        swap_fee: U128(0),
-                        is_scalar: None
-                    }
-                }), 
-                true
-            ),
-            0,
-            DEFAULT_GAS
-        );
-        println!("dr new res {:?}", res);
-        assert!(res.is_ok(), "data request creation failed with res: {:?}", res);
-        res
-    }
-
     pub fn ft_transfer_call(
         &self,
         receiver: String,
         amount: u128,
         msg: String
-    ) -> ExecutionResult {
-        println!("receiver: {}", receiver);
-        
+    ) -> ExecutionResult {        
         let res = self.account.call(
             PendingContractTx::new(
                 TOKEN_CONTRACT_ID, 
                 "ft_transfer_call", 
                 json!({
                     "receiver_id": receiver,
-                    "amount": U128::from(amount),
+                    "amount": U128(amount),
                     "msg": msg,
                     "memo": "".to_string()
                 }), 

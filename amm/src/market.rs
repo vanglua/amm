@@ -1,5 +1,4 @@
 use crate::*;
-use crate::types::{ Timestamp, WrappedBalance };
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Market {

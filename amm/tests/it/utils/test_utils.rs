@@ -312,11 +312,12 @@ pub fn ft_transfer_call(
 }
 
 pub fn empty_string() -> String { "".to_string() }
+pub fn basic_string() -> String { "foo".to_string() }
 
 pub fn empty_string_vec(len: u16) -> Vec<String> { 
     let mut tags: Vec<String> = vec![];
     for i in 0..len {
-        tags.push(empty_string());
+        tags.push(basic_string()());
     }
     
     tags
@@ -332,8 +333,8 @@ pub fn fee() -> U128 {
 pub fn create_market(creator: &UserAccount, amm: &ContractAccount<AMMContractContract>, outcomes: u16, fee_opt: Option<U128>) -> ExecutionResult {
     let msg = json!({
         "CreateMarketArgs": {
-            "description": empty_string(),
-            "extra_info": empty_string(),
+            "description": basic_string(),
+            "extra_info": basic_string(),
             "outcomes": outcomes,
             "outcome_tags": empty_string_vec(outcomes),
             "categories": empty_string_vec(outcomes),
