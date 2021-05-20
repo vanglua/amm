@@ -2,7 +2,9 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{U128, U64, ValidAccountId};
 use near_sdk::collections::{Vector, UnorderedMap, LookupMap};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
+    serde_json,
     PromiseOrValue,
     Balance,
     StorageUsage,
@@ -27,7 +29,7 @@ mod pool_factory;
 mod resolution_escrow;
 mod market;
 mod gov; 
-mod fungible_token_receiver;
+pub mod fungible_token_receiver;
 mod oracle;
 mod market_creation;
 mod fungible_token;
@@ -86,8 +88,7 @@ impl AMMContract {
             markets: Vector::new(b"m".to_vec()),
             collateral_whitelist: collateral_whitelist, 
             paused: false,
-            accounts: LookupMap::new(b"a".to_vec()),
+            accounts: LookupMap::new(b"as".to_vec()),
         }
     }
 }
-

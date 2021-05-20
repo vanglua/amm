@@ -1,5 +1,4 @@
 use crate::*;
-use near_sdk::Balance;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct OutcomeToBalanceMap(LookupMap<u16, Balance>);

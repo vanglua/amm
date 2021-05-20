@@ -40,6 +40,7 @@ impl Contract {
     }
 }
 
+#[near_bindgen]
 impl Contract {
 
     pub fn assert_sender(&self, expected_sender: &AccountId) {

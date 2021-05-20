@@ -6,7 +6,7 @@ use crate::oracle::{ DataRequestArgs };
 #[ext_contract(ext_self)]
 trait ProtocolResolver {
     fn proceed_market_enabling(market_id: U64) -> Promise;
-    fn proceed_datarequest_creation(&mut self, sender: AccountId, bond_token: AccountId, bond_in: WrappedBalance, market_id: U64, market_args: CreateMarketArgs) -> PromiseOrValue<u8>;
+    fn proceed_datarequest_creation(&mut self, sender: AccountId, bond_token: AccountId, bond_in: WrappedBalance, market_id: U64, market_args: CreateMarketArgs) -> Promise;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -33,14 +33,14 @@ impl AMMContract {
             },
             PromiseResult::Failed => panic!("ERR_FAILED_ORACLE_CONFIG_FETCH"),
         };
-
+        
         let validity_bond: u128 = oracle_config.validity_bond.into();
         let bond_in: u128 = bond_in.into();
 
         assert_eq!(oracle_config.bond_token, bond_token, "ERR_INVALID_BOND_TOKEN");
         assert!(validity_bond <= bond_in, "ERR_NOT_ENOUGH_BOND");
 
-        let is_scalar = market_args.is_scalar.unwrap_or(false);
+        let is_scalar = market_args.is_scalar.is_some();
         let outcomes: Option<Vec<String>> = if is_scalar {
             None
         } else {
@@ -141,11 +141,10 @@ impl AMMContract {
         payload: CreateMarketArgs
     ) -> Promise {
         self.assert_unpaused();
-
         let market_id = self.create_market(&payload);
-
         oracle::fetch_oracle_config(&self.oracle)
-            .then(ext_self::proceed_datarequest_creation(
+            .then(
+                ext_self::proceed_datarequest_creation(
                 sender.to_string(), 
                 env::predecessor_account_id(), 
                 U128(bond_in), 
@@ -154,6 +153,7 @@ impl AMMContract {
                 &env::current_account_id(), 
                 0, 
                 150_000_000_000_000
-            ))
+            )
+        )
     }
 }

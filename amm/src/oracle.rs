@@ -29,7 +29,7 @@ impl AMMContract {
             json!({
                 "NewDataRequest": {
                     // 12 hours in nano seconds
-                    "challenge_period": U64(43200000000000),
+                    "challenge_period": U64(1000),
                     "settlement_time": U64(request_args.settlement_time),
                     "target_contract": env::current_account_id(),
                     "outcomes": request_args.outcomes,

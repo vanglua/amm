@@ -118,7 +118,16 @@ impl AMMContract {
             // used more storage, deduct from balance
             let difference : u128 = u128::from(env::storage_usage() - initial_storage_usage);
             let mut account = self.get_storage_account(sender_id);
-            account.available = initial_available_balance - difference * STORAGE_PRICE_PER_BYTE;
+            let cost = difference * STORAGE_PRICE_PER_BYTE;
+
+            assert!(
+                initial_available_balance > cost, 
+                "{} has balance of: {} but requires: {}", 
+                sender_id,
+                initial_available_balance,
+                cost
+            );
+            account.available = initial_available_balance - cost;
 
             self.accounts.insert(sender_id, &account);
         } else {

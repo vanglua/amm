@@ -1,8 +1,4 @@
 use crate::*;
-use near_sdk::serde::{ Serialize, Deserialize };
-use near_sdk::serde_json;
-use crate::types::{ WrappedBalance };
-use storage_manager::{ STORAGE_PRICE_PER_BYTE };
 
 /**
  * @notice `create_market` args
@@ -49,7 +45,7 @@ pub enum Payload {
 
 pub trait FungibleTokenReceiver {
     // @returns amount of unused tokens
-    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: WrappedBalance, msg: String) -> WrappedBalance;
+    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: WrappedBalance, msg: String) -> PromiseOrValue<U128>;
 }
 
 #[near_bindgen]
@@ -67,7 +63,7 @@ impl FungibleTokenReceiver for AMMContract {
         sender_id: AccountId,
         amount: WrappedBalance,
         msg: String,
-    ) -> WrappedBalance {
+    ) -> PromiseOrValue<U128> {
         self.assert_unpaused();
 
         let amount: u128 = amount.into();
@@ -84,7 +80,7 @@ impl FungibleTokenReceiver for AMMContract {
 
         self.use_storage(&sender_id, initial_storage_usage, account.available);
 
-        0.into()
+        PromiseOrValue::Value(U128(0))
     }
 }
 

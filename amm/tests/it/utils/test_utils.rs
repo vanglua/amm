@@ -26,7 +26,6 @@ use near_sdk_sim::{
 };
 
 extern crate amm;
-
 pub use amm::*;
 
 use oracle::{oracle_config::OracleConfig, ContractContract};
@@ -212,6 +211,17 @@ pub fn storage_deposit(receiver: &str, sender: &UserAccount, deposit: u128, to_r
     assert!(res.is_ok(), "storage deposit failed with res: {:?}", res);
 }
 
+pub fn dr_get_expect(sender: &UserAccount, dr_id: u64) {
+    let res: bool = sender.view(
+        PendingContractTx::new(
+            ORACLE_CONTRACT_ID,
+            "dr_exists",
+            json!({"dr_id": U64(dr_id)}),
+            true
+        )
+    ).unwrap_json();
+}
+
 pub fn near_deposit(sender: &UserAccount, deposit: u128) {
     let res = sender.call(
         PendingContractTx::new(
@@ -303,11 +313,12 @@ pub fn ft_transfer_call(
 }
 
 pub fn empty_string() -> String { "".to_string() }
+pub fn basic_string() -> String { "foo".to_string() }
 
 pub fn empty_string_vec(len: u16) -> Vec<String> { 
     let mut tags: Vec<String> = vec![];
     for i in 0..len {
-        tags.push(empty_string());
+        tags.push(basic_string()());
     }
     
     tags
@@ -323,8 +334,8 @@ pub fn fee() -> U128 {
 pub fn create_market(creator: &UserAccount, amm: &ContractAccount<AMMContractContract>, outcomes: u16, fee_opt: Option<U128>) -> ExecutionResult {
     let msg = json!({
         "CreateMarketArgs": {
-            "description": empty_string(),
-            "extra_info": empty_string(),
+            "description": basic_string(),
+            "extra_info": basic_string(),
             "outcomes": outcomes,
             "outcome_tags": empty_string_vec(outcomes),
             "categories": empty_string_vec(outcomes),
