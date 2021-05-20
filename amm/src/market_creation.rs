@@ -49,7 +49,7 @@ impl AMMContract {
 
         let remaining_bond: u128 = bond_in - validity_bond;
         let create_promise = self.create_data_request(&bond_token, validity_bond, DataRequestArgs {
-            description: market_args.description,
+            description: format!("{} - {}", market_args.description, market_args.extra_info),
             outcomes,
             settlement_time: market_args.resolution_time.into(),
             tags: vec![market_id.0.to_string()],
