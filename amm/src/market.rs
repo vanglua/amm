@@ -539,6 +539,10 @@ mod market_basic_tests {
             }
         );
 
+        let mut market = contract.get_market_expect(U64(0));
+        market.enabled = true;
+        contract.markets.replace(0, &market);
+
         testing_env!(get_context(token(), ms_to_ns(1619882574000)));
 
         let add_liquidity_args = AddLiquidityArgs {
@@ -608,6 +612,10 @@ mod market_basic_tests {
 
         testing_env!(get_context(token(), 0));
 
+        let mut market = contract.get_market_expect(U64(0));
+        market.enabled = true;
+        contract.markets.replace(0, &market);
+
         let add_liquidity_args = AddLiquidityArgs {
             market_id,
             weight_indication: Some(vec![U128(2), U128(1)])
@@ -653,6 +661,10 @@ mod market_basic_tests {
         );
 
         testing_env!(get_context(token(), 0));
+
+        let mut market = contract.get_market_expect(U64(0));
+        market.enabled = true;
+        contract.markets.replace(0, &market);
 
         let add_liquidity_args = AddLiquidityArgs {
             market_id,

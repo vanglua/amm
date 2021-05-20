@@ -172,6 +172,10 @@ mod mock_token_basic_tests {
             }
         );
 
+        let mut market = contract.get_market_expect(U64(0));
+        market.enabled = true;
+        contract.markets.replace(0, &market);
+
         let msg = serde_json::json!({
             "AddLiquidityArgs": {
                 "market_id": "0",
@@ -180,6 +184,7 @@ mod mock_token_basic_tests {
         });
         contract.ft_on_transfer(alice(), U128(10000000000000000000), msg.to_string());
     }
+
 
     #[test]
     fn transfer_storage_funds() {
@@ -204,6 +209,10 @@ mod mock_token_basic_tests {
                 is_scalar: None
             }
         );
+
+        let mut market = contract.get_market_expect(U64(0));
+        market.enabled = true;
+        contract.markets.replace(0, &market);
 
         let storage_start = 10u128.pow(24);
 
