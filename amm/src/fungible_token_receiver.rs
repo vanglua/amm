@@ -148,7 +148,7 @@ mod mock_token_basic_tests {
     }
 
     #[test]
-    #[should_panic(expected = "attempt to subtract with overflow")]
+    #[should_panic(expected = "alice.near has balance of: 0 but requires: 12910000000000000000000")]
     fn transfer_storage_no_funds() {
         testing_env!(get_context(token()));
         let mut contract = AMMContract::init(
