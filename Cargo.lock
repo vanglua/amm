@@ -42,7 +42,7 @@ version = "0.1.0"
 dependencies = [
  "near-sdk 3.0.0",
  "near-sdk-sim 3.0.0-pre-release",
- "oracle",
+ "oracle 0.1.0 (git+https://github.com/fluxprotocol/oracle-monorepo?rev=cbfce655103df7bfbf848bb9e551a0cfcb250e0e)",
  "serde",
  "token",
  "uint 0.8.5",
@@ -2272,6 +2272,16 @@ dependencies = [
  "near-sdk-sim 3.0.0-pre-release",
  "serde",
  "token",
+ "uint 0.9.0",
+]
+
+[[package]]
+name = "oracle"
+version = "0.1.0"
+source = "git+https://github.com/fluxprotocol/oracle-monorepo?rev=cbfce655103df7bfbf848bb9e551a0cfcb250e0e#cbfce655103df7bfbf848bb9e551a0cfcb250e0e"
+dependencies = [
+ "near-sdk 3.0.0",
+ "serde",
  "uint 0.9.0",
 ]
 
