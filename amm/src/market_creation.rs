@@ -54,7 +54,6 @@ impl AMMContract {
             settlement_time: market_args.resolution_time.into(),
             tags: vec![market_id.0.to_string()],
         });
-
         // Refund the remaining tokens
         if remaining_bond > 0 {
             create_promise
@@ -62,6 +61,7 @@ impl AMMContract {
                 // We trigger the proceeding last so we can check the promise for failures
                 .then(ext_self::proceed_market_enabling(market_id, &env::current_account_id(), 0, 25_000_000_000_000))
         } else {
+
             create_promise
                 .then(ext_self::proceed_market_enabling(market_id, &env::current_account_id(), 0, 25_000_000_000_000))
         }
@@ -70,7 +70,7 @@ impl AMMContract {
     pub fn proceed_market_enabling(&mut self, market_id: U64) {
         assert_self();
         assert_prev_promise_successful();
-
+        
         let mut market = self.get_market_expect(market_id);
         market.enabled = true;
         self.markets.replace(market_id.into(), &market);

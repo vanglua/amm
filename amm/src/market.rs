@@ -165,7 +165,7 @@ impl AMMContract {
         let initial_storage = env::storage_usage();
         let collateral_out: u128 = collateral_out.into();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         let escrowed = market.pool.sell(
@@ -204,7 +204,7 @@ impl AMMContract {
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_MARKET_FINALIZED");
 
         let escrowed = market.pool.burn_outcome_tokens_redeem_collateral(
@@ -246,7 +246,7 @@ impl AMMContract {
         let initial_storage = env::storage_usage();
 
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
 
         let fees_earned = market.pool.exit_pool(
             &env::predecessor_account_id(),
@@ -289,7 +289,7 @@ impl AMMContract {
         self.assert_gov();
         // let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
         assert!(market.resolution_time <= ns_to_ms(env::block_timestamp()), "ERR_RESOLUTION_TIME_NOT_REACHED");
         match &payout_numerator {
@@ -321,7 +321,7 @@ impl AMMContract {
         self.assert_unpaused();
         let initial_storage = env::storage_usage();
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(market.finalized, "ERR_NOT_FINALIZED");
 
         let payout = market.pool.payout(&env::predecessor_account_id(), &market.payout_numerator);
@@ -370,7 +370,7 @@ impl AMMContract {
         sender: &AccountId,
         total_in: u128,
         args: AddLiquidityArgs,
-    ) -> PromiseOrValue<u8> {
+    ) -> PromiseOrValue<U128> {
         let weights_u128: Option<Vec<u128>> = match args.weight_indication {
             Some(weight_indication) => {
                 Some(weight_indication
@@ -383,7 +383,7 @@ impl AMMContract {
         };
            
         let mut market = self.markets.get(args.market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         assert_collateral_token(&market.pool.collateral_token_id);
@@ -394,7 +394,7 @@ impl AMMContract {
             weights_u128
         );
         self.markets.replace(args.market_id.into(), &market);
-        PromiseOrValue::Value(0)
+        PromiseOrValue::Value(0.into())
     }
 
 
@@ -409,9 +409,9 @@ impl AMMContract {
         sender: &AccountId,
         collateral_in: u128, 
         args: BuyArgs,
-    ) -> PromiseOrValue<u8> {
+    ) -> PromiseOrValue<U128> {
         let mut market = self.markets.get(args.market_id.into()).expect("ERR_NO_MARKET");
-        assert!(!market.enabled, "ERR_DISABLED_MARKET");
+        assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_FINALIZED_MARKET");
         assert!(market.end_time > ns_to_ms(env::block_timestamp()), "ERR_MARKET_ENDED");
         assert_collateral_token(&market.pool.collateral_token_id);
@@ -424,7 +424,7 @@ impl AMMContract {
         );
 
         self.markets.replace(args.market_id.into(), &market);
-        PromiseOrValue::Value(0)
+        PromiseOrValue::Value(0.into())
     }
 }
 

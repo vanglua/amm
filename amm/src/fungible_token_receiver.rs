@@ -72,7 +72,7 @@ impl FungibleTokenReceiver for AMMContract {
         let account = self.get_storage_account(&sender_id);
 
         let payload: Payload = serde_json::from_str(&msg).expect("Failed to parse the payload, invalid `msg` format");
-        match payload {
+        let res = match payload {
             Payload::BuyArgs(payload) => self.buy(&sender_id, amount, payload), 
             Payload::AddLiquidityArgs(payload) => self.add_liquidity(&sender_id, amount, payload),
             Payload::CreateMarketArgs(payload) => self.ft_create_market_callback(&sender_id, amount, payload).into()
@@ -80,7 +80,7 @@ impl FungibleTokenReceiver for AMMContract {
 
         self.use_storage(&sender_id, initial_storage_usage, account.available);
 
-        PromiseOrValue::Value(U128(0))
+        res
     }
 }
 
