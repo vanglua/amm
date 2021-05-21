@@ -1,5 +1,5 @@
 use crate::utils::*;
-use near_sdk::json_types::{U64, U128};
+use near_sdk::json_types::{U128};
 use near_sdk_sim::{to_yocto};
 
 #[test]
@@ -40,11 +40,9 @@ fn add_liquidity_uneven_liq_test() {
     
     // variables
     let market_id = 0;
-    let creation_bond = 100;
     
     let target_price_a = to_yocto("60") / 100;
     let target_price_b_c = to_yocto("20") / 100;
-    let seed_amount = to_yocto("10");
     let target_prices = vec![U128(target_price_a), U128(target_price_b_c), U128(target_price_b_c)];
     let weights = Some(calc_weights_from_price(target_prices));
     let seed_amount = to_yocto("100");
@@ -87,7 +85,6 @@ fn multiple_pool_exits_test() {
     let test_utils = TestUtils::init(carol());
 
     let market_id = 0;
-    let creation_bond = 100;
     let seed_amount = to_yocto("10");
     let join_amount0 = to_yocto("50");
     let join_amount1 = to_yocto("30");
