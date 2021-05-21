@@ -59,10 +59,10 @@ impl AMMContract {
     pub fn get_pool_token_balance(
         &self, 
         market_id: U64, 
-        owner_id: &AccountId
+        account_id: &AccountId
     ) -> WrappedBalance {
         let market = self.get_market_expect(market_id);
-        U128(market.pool.get_pool_token_balance(owner_id))
+        U128(market.pool.get_pool_token_balance(account_id))
     }
 
     /**

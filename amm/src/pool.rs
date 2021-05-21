@@ -82,11 +82,11 @@ impl Pool {
 
     /**
      * TODO: improve consistency of argument naming
-     * @param owner_id the owner for whom to return the pool token balance
+     * @param account_id the owner for whom to return the pool token balance
      * @returns pool token balance of owner
      */
-    pub fn get_pool_token_balance(&self, owner_id: &AccountId) -> Balance {
-        self.pool_token.get_balance(owner_id)
+    pub fn get_pool_token_balance(&self, account_id: &AccountId) -> Balance {
+        self.pool_token.get_balance(account_id)
     }
 
     pub fn get_pool_balances(&self) -> Vec<Balance> {

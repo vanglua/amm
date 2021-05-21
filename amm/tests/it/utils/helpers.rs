@@ -34,3 +34,19 @@ pub fn fee() -> U128 {
 pub fn transfer_call_storage_amount() -> u128 {
     1
 }
+
+pub fn product_of(nums: &Vec<U128>) -> u128 {
+    assert!(nums.len() > 1, "ERR_INVALID_NUMS");
+    nums.iter().fold(to_yocto("1"), |prod, &num| {
+        let num_u128: u128 = num.into();
+        math::complex_mul_u128(to_yocto("1"), prod, num_u128)
+    })
+}
+
+pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
+    let product = product_of(&prices);
+    
+    prices.iter().map(|price| {
+       U128(math::complex_div_u128(to_yocto("1"), u128::from(product), u128::from(*price)))
+    }).collect()
+}

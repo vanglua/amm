@@ -47,9 +47,30 @@ impl TestAccount {
 
         res.into()
     }
+    
+    pub fn get_pool_token_balance(&self, market_id: u64, account_id: Option<String>) -> u128 {
+        let account_id = match account_id {
+            Some(account_id) => account_id,
+            None => self.account.account_id()
+        };
+
+        let res: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "get_pool_token_balance", 
+                json!({
+                    "market_id": U64(market_id),
+                    "account_id": account_id
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        res.into()
+    }
 
     pub fn get_pool_balances(&self, market_id: u64) -> Vec<u128> {
-        let wrapped_balance: Vec<U128> = self.account.view(
+        let wrapped_balances: Vec<U128> = self.account.view(
             PendingContractTx::new(
                 AMM_CONTRACT_ID, 
                 "get_pool_balances", 
@@ -60,8 +81,45 @@ impl TestAccount {
             )
         ).unwrap_json();
 
-        wrapped_balance.into_iter().map(|wrapped_balance| { wrapped_balance.into() }).collect()
+        wrapped_balances.into_iter().map(|wrapped_balances| { wrapped_balances.into() }).collect()
+    }
 
+    pub fn get_outcome_balance(&self, account_id: Option<AccountId>, market_id: u64, outcome: u16) -> u128 {
+        let account_id = match account_id {
+            Some(account_id) => account_id,
+            None => self.account.account_id()
+        };
+
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "get_share_balance", 
+                json!({
+                    "account_id": account_id, 
+                    "market_id": U64(market_id),
+                    "outcome": outcome
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
+    }
+
+    pub fn get_spot_price_sans_fee(&self, market_id: u64, outcome: u16) -> u128 {
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "get_spot_price_sans_fee", 
+                json!({
+                    "market_id": U64(market_id),
+                    "outcome": outcome
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
     }
 
     /*** Setters ***/
@@ -93,6 +151,36 @@ impl TestAccount {
         self.ft_transfer_call(AMM_CONTRACT_ID.to_string(), amount, msg)
     }
 
+    pub fn exit_liquidity(&self, market_id: u64, total_in: u128) -> ExecutionResult {
+        let res = self.account.call(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "exit_pool", 
+                json!({
+                    "market_id": U64(market_id),
+                    "total_in": U128(total_in)
+                }), 
+                true
+            ),
+            1,
+            DEFAULT_GAS
+        );
+        println!("{:?}", res);
+        assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
+        res
+    }
+
+    pub fn buy(&self, market_id: u64, amount: u128, outcome: u16, min_amount_out: u128) -> ExecutionResult {
+        let msg  = json!({
+            "BuyArgs": {
+                "market_id": U64(market_id),
+                "outcome_target": outcome,
+                "min_shares_out": U128(min_amount_out)
+            }
+        }).to_string();
+        self.ft_transfer_call(AMM_CONTRACT_ID.to_string(), amount, msg)
+    }
+
     pub fn ft_transfer_call(
         &self,
         receiver: String,
@@ -114,7 +202,7 @@ impl TestAccount {
             1,
             DEFAULT_GAS
         );
-        println!("{:?}", res);
+        // println!("{:?}", res);
         assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
         res
     }

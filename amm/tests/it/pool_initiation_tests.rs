@@ -1,6 +1,6 @@
 use crate::utils::*;
 use near_sdk::json_types::{U64, U128};
-use near_sdk_sim::{to_yocto, view, call};
+use near_sdk_sim::{to_yocto, view};
 
 #[test]
 fn pool_initial_state_test() {

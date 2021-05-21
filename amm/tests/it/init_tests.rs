@@ -1,5 +1,3 @@
-use near_sdk_sim::to_yocto;
-use near_sdk::json_types::U128;
 use crate::utils::*;
 
 #[test]
