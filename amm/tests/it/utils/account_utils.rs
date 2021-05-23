@@ -122,6 +122,22 @@ impl TestAccount {
         wrapped_balance.into()
     }
 
+    pub fn get_spot_price(&self, market_id: u64, outcome: u16) -> u128 {
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "get_spot_price", 
+                json!({
+                    "market_id": U64(market_id),
+                    "outcome": outcome
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
+    }
+
     /*** Setters ***/
     pub fn create_market(&self, outcomes: u16, fee_opt: Option<U128>) -> ExecutionResult {
         let msg = json!({
@@ -162,7 +178,7 @@ impl TestAccount {
                 }), 
                 true
             ),
-            1,
+            STORAGE_AMOUNT,
             DEFAULT_GAS
         );
         println!("{:?}", res);
@@ -179,6 +195,59 @@ impl TestAccount {
             }
         }).to_string();
         self.ft_transfer_call(AMM_CONTRACT_ID.to_string(), amount, msg)
+    }
+
+    pub fn redeem_collateral(&self, market_id: u64, amount_out: u128) -> ExecutionResult {
+        let res = self.account.call(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "burn_outcome_tokens_redeem_collateral", 
+                json!({
+                    "market_id": U64(market_id),
+                    "to_burn": U128(amount_out)
+                }), 
+                true
+            ),
+            STORAGE_AMOUNT,
+            DEFAULT_GAS
+        );
+        assert!(res.is_ok(), "redeem_collateral failed with res: {:?}", res);
+        res
+    }
+
+    pub fn resolute_market(&self, market_id: u64, payout_numerator: Option<Vec<U128>>) -> ExecutionResult {
+        let res = self.account.call(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "resolute_market", 
+                json!({
+                    "market_id": U64(market_id),
+                    "payout_numerator": payout_numerator
+                }), 
+                true
+            ),
+            STORAGE_AMOUNT,
+            DEFAULT_GAS
+        );
+        assert!(res.is_ok(), "redeem_collateral failed with res: {:?}", res);
+        res
+    }
+
+    pub fn claim_earnings(&self, market_id: u64) -> ExecutionResult {
+        let res = self.account.call(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "claim_earnings", 
+                json!({
+                    "market_id": U64(market_id),
+                }), 
+                true
+            ),
+            STORAGE_AMOUNT,
+            DEFAULT_GAS
+        );
+        assert!(res.is_ok(), "redeem_collateral failed with res: {:?}", res);
+        res
     }
 
     pub fn ft_transfer_call(

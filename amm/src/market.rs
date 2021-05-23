@@ -81,6 +81,21 @@ impl AMMContract {
     }
 
     /**
+     * @notice returns the current spot price of an outcome without taking a fee into account
+     * @param market_id is the index of the market to retrieve data from
+     * @param outcome is the outcome to get the current spot price fpr
+     * @returns a wrapped price of the outcome at current state
+     */
+    pub fn get_spot_price(
+        &self,
+        market_id: U64,
+        outcome: u16
+    ) -> WrappedBalance {
+        let market = self.get_market_expect(market_id);
+        market.pool.get_spot_price(outcome).into()
+    }
+
+    /**
      * @notice calculates the amount of shares of a certain outcome a user would get out for the collateral they provided
      * @param market_id is the index of the market to retrieve data from
      * @param collateral_in is the amount of collateral to be used to calculate amount of shares out
@@ -291,7 +306,6 @@ impl AMMContract {
         let mut market = self.markets.get(market_id.into()).expect("ERR_NO_MARKET");
         assert!(market.enabled, "ERR_DISABLED_MARKET");
         assert!(!market.finalized, "ERR_IS_FINALIZED");
-        assert!(market.resolution_time <= ns_to_ms(env::block_timestamp()), "ERR_RESOLUTION_TIME_NOT_REACHED");
         match &payout_numerator {
             Some(v) => {
                 let sum = v.iter().fold(0, |s, &n| s + u128::from(n));
@@ -584,56 +598,57 @@ mod market_basic_tests {
         );
     }
 
-    #[test]
-    #[should_panic(expected = "ERR_RESOLUTION_TIME_NOT_REACHED")]
-    fn resolute_before_resolution_time() {
-        testing_env!(get_context(alice(), 0));
+    // TODO: should be changed with oracle integration
+    // #[test]
+    // #[should_panic(expected = "ERR_RESOLUTION_TIME_NOT_REACHED")]
+    // fn resolute_before_resolution_time() {
+    //     testing_env!(get_context(alice(), 0));
 
-        let mut contract = AMMContract::init(
-            bob().try_into().unwrap(),
-            vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
-            oracle().try_into().unwrap()
-        );
+    //     let mut contract = AMMContract::init(
+    //         bob().try_into().unwrap(),
+    //         vec![collateral_whitelist::Token{account_id: token(), decimals: 24}],
+    //         oracle().try_into().unwrap()
+    //     );
 
-        let market_id = contract.create_market(
-            &CreateMarketArgs {
-                description: empty_string(), // market description
-                extra_info: empty_string(), // extra info
-                outcomes: 2, // outcomes
-                outcome_tags: empty_string_vec(2), // outcome tags
-                categories: empty_string_vec(2), // categories
-                end_time: 1609951265967.into(), // end_time
-                resolution_time: 1619882574000.into(), // resolution_time (~1 day after end_time)
-                collateral_token_id: token(), // collateral_token_id
-                swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
-            }
-        );
+    //     let market_id = contract.create_market(
+    //         &CreateMarketArgs {
+    //             description: empty_string(), // market description
+    //             extra_info: empty_string(), // extra info
+    //             outcomes: 2, // outcomes
+    //             outcome_tags: empty_string_vec(2), // outcome tags
+    //             categories: empty_string_vec(2), // categories
+    //             end_time: 1609951265967.into(), // end_time
+    //             resolution_time: 1619882574000.into(), // resolution_time (~1 day after end_time)
+    //             collateral_token_id: token(), // collateral_token_id
+    //             swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
+    //             is_scalar: None // is_scalar
+    //         }
+    //     );
 
-        testing_env!(get_context(token(), 0));
+    //     testing_env!(get_context(token(), 0));
 
-        let mut market = contract.get_market_expect(U64(0));
-        market.enabled = true;
-        contract.markets.replace(0, &market);
+    //     let mut market = contract.get_market_expect(U64(0));
+    //     market.enabled = true;
+    //     contract.markets.replace(0, &market);
 
-        let add_liquidity_args = AddLiquidityArgs {
-            market_id,
-            weight_indication: Some(vec![U128(2), U128(1)])
-        };
+    //     let add_liquidity_args = AddLiquidityArgs {
+    //         market_id,
+    //         weight_indication: Some(vec![U128(2), U128(1)])
+    //     };
 
-        contract.add_liquidity(
-            &alice(), // sender
-            10000000000000000000, // total_in
-            add_liquidity_args
-        );
+    //     contract.add_liquidity(
+    //         &alice(), // sender
+    //         10000000000000000000, // total_in
+    //         add_liquidity_args
+    //     );
 
-        testing_env!(get_context(bob(), 0));
+    //     testing_env!(get_context(bob(), 0));
 
-        contract.resolute_market(
-            market_id,
-            Some(vec![U128(1000000000000000000000000), U128(0)]) // payout_numerator
-        );
-    }
+    //     contract.resolute_market(
+    //         market_id,
+    //         Some(vec![U128(1000000000000000000000000), U128(0)]) // payout_numerator
+    //     );
+    // }
 
     #[test]
     fn resolute_after_resolution_time() {
