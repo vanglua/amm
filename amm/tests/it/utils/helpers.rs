@@ -35,7 +35,7 @@ pub fn transfer_call_storage_amount() -> u128 {
     1
 }
 
-pub fn product_of(nums: &Vec<U128>) -> u128 {
+pub fn product_of(nums: &Vec<u128>) -> u128 {
     assert!(nums.len() > 1, "ERR_INVALID_NUMS");
     nums.iter().fold(to_yocto("1"), |prod, &num| {
         let num_u128: u128 = num.into();
@@ -43,7 +43,7 @@ pub fn product_of(nums: &Vec<U128>) -> u128 {
     })
 }
 
-pub fn calc_weights_from_price(prices: Vec<U128>) -> Vec<U128> {
+pub fn calc_weights_from_price(prices: Vec<u128>) -> Vec<U128> {
     let product = product_of(&prices);
     
     prices.iter().map(|price| {

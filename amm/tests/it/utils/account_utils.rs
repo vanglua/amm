@@ -138,6 +138,61 @@ impl TestAccount {
         wrapped_balance.into()
     }
 
+    pub fn calc_buy_amount(&self, market_id: u64, outcome: u16, collateral_in: u128) -> u128 {
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "calc_buy_amount", 
+                json!({
+                    "market_id": U64(market_id),
+                    "collateral_in": U128(collateral_in),
+                    "outcome_target": outcome
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
+    }
+
+    pub fn calc_sell_amount(&self, market_id: u64, outcome: u16, collateral_out: u128) -> u128 {
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "calc_sell_collateral_out", 
+                json!({
+                    "market_id": U64(market_id),
+                    "collateral_out": U128(collateral_out),
+                    "outcome_target": outcome
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
+    }
+
+    pub fn get_fees_withdrawable(&self, market_id: u64, account_id: Option<AccountId>) -> u128 {
+        let account_id = match account_id {
+            Some(account_id) => account_id,
+            None => self.account.account_id()
+        };
+
+        let wrapped_balance: U128 = self.account.view(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "get_fees_withdrawable", 
+                json!({
+                    "market_id": U64(market_id),
+                    "account_id": account_id,
+                }), 
+                true
+            )
+        ).unwrap_json();
+
+        wrapped_balance.into()
+    }
+
     /*** Setters ***/
     pub fn create_market(&self, outcomes: u16, fee_opt: Option<U128>) -> ExecutionResult {
         let msg = json!({
@@ -195,6 +250,26 @@ impl TestAccount {
             }
         }).to_string();
         self.ft_transfer_call(AMM_CONTRACT_ID.to_string(), amount, msg)
+    }
+    
+    pub fn sell(&self, market_id: u64, amount_out: u128, outcome: u16, max_shares_in: u128) -> ExecutionResult {
+        let res = self.account.call(
+            PendingContractTx::new(
+                AMM_CONTRACT_ID, 
+                "sell", 
+                json!({
+                    "market_id": U64(market_id),
+                    "collateral_out": U128(amount_out),
+                    "outcome_target": outcome,
+                    "max_shares_in": U128(max_shares_in)
+                }), 
+                true
+            ),
+            STORAGE_AMOUNT,
+            DEFAULT_GAS
+        );
+        assert!(res.is_ok(), "sell failed with res: {:?}", res);
+        res
     }
 
     pub fn redeem_collateral(&self, market_id: u64, amount_out: u128) -> ExecutionResult {

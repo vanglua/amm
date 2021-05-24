@@ -113,7 +113,6 @@ impl AMMContract {
     }
 
     /**
-     * TODO: Rename to calc_sell_shares_in
      * @notice calculates the amount of shares a user has to put in in order to get `collateral_out`
      * @param market_id is the index of the market to retrieve data from
      * @param collateral_out is the amount of collateral that a user wants to get out of a position, it's used to calculate the amount of `outcome_shares` that need to be transferred in

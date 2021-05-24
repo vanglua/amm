@@ -14,7 +14,7 @@ fn multi_lp_payout_no_exit() {
 
     let target_price_0 = to_yocto("9999") / 10000;
     let target_price_1 = to_yocto("1") / 100;
-    let weights = calc_weights_from_price(vec![U128(target_price_1), U128(target_price_0)]);
+    let weights = calc_weights_from_price(vec![target_price_1, target_price_0]);
 
     test_utils.alice.create_market(2, Some(U128(0)));
     test_utils.bob.add_liquidity(market_id, seed_amount_0, Some(weights));

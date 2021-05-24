@@ -43,7 +43,7 @@ fn add_liquidity_uneven_liq_test() {
     
     let target_price_a = to_yocto("60") / 100;
     let target_price_b_c = to_yocto("20") / 100;
-    let target_prices = vec![U128(target_price_a), U128(target_price_b_c), U128(target_price_b_c)];
+    let target_prices = vec![target_price_a, target_price_b_c, target_price_b_c];
     let weights = Some(calc_weights_from_price(target_prices));
     let seed_amount = to_yocto("100");
     
