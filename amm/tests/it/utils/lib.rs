@@ -14,8 +14,6 @@ use near_sdk::{
 
 use near_sdk_sim::{
     ExecutionResult,
-    call,
-    view,
     deploy, 
     init_simulator, 
     to_yocto, 
@@ -71,7 +69,7 @@ impl TestUtils {
     ) -> Self {
         let master_account = TestAccount::new(None, None);
         let token_init_res = token_utils::TokenUtils::new(&master_account); // Init token
-        let oracle_init_res = oracle_utils::OracleUtils::new(&master_account, gov_id.to_string());  // Init oracle
+        let oracle_init_res = oracle_utils::OracleUtils::new(&master_account);  // Init oracle
         let amm_init_res = amm_utils::AMMUtils::new(&master_account, gov_id.to_string()); // Init amm
     
         Self {

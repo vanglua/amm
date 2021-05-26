@@ -1,7 +1,7 @@
 // mod test_utils;
 use crate::utils::*;
 use near_sdk::json_types::U128;
-use near_sdk_sim::{to_yocto, call, STORAGE_AMOUNT};
+use near_sdk_sim::{to_yocto };
 
 #[test]
 fn multi_lp_payout_no_exit() {

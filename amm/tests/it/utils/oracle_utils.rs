@@ -6,7 +6,7 @@ pub struct OracleUtils {
 }
 
 impl OracleUtils {
-    pub fn new(master_account: &TestAccount, gov_id: AccountId) -> Self {
+    pub fn new(master_account: &TestAccount) -> Self {
         let config = OracleConfig {
             gov: "alice".to_string(),
             final_arbitrator: "alice".to_string(),

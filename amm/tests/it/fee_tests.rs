@@ -17,8 +17,6 @@ fn fee_valid_market_lp_fee_test() {
     test_utils.alice.create_market(2, Some(U128(swap_fee)));
     test_utils.alice.add_liquidity(market_id, seed_amount, weights);
 
-    let payout_num = vec![U128(0), U128(to_yocto("1"))];
-
     test_utils.carol.buy(market_id, buy_amount, 0, 0);
     test_utils.carol.buy(market_id, buy_amount, 1, 0);
     test_utils.carol.buy(market_id, buy_amount, 0, 0);
@@ -56,8 +54,6 @@ fn fee_invalid_market_lp_fee_test() {
     let bob_init_balance = test_utils.bob.get_token_balance(None);
     let carol_init_balance = test_utils.carol.get_token_balance(None);
     test_utils.alice.add_liquidity(market_id, seed_amount, weights);
-
-    let payout_num = vec![U128(0), U128(to_yocto("1"))];
 
     test_utils.carol.buy(market_id, buy_amount, 0, 0);
     test_utils.carol.buy(market_id, buy_amount, 1, 0);
@@ -116,7 +112,6 @@ fn test_specific_fee_scenario() {
 
     let target_price = to_yocto("5") / 10;
     let seed_amount = to_yocto("10");
-    let buy_amount = to_yocto("1");
     let weights = Some(calc_weights_from_price(vec![target_price, target_price]));
     let swap_fee = to_yocto("2") / 100;
     test_utils.alice.create_market(2, Some(U128(swap_fee)));
