@@ -1,4 +1,6 @@
 use crate::utils::*;
+use amm::types::Source;
+
 const AMM_DEPOSIT: u128 = 50000000000000000000000;
 pub fn init_balance() -> u128 {
     to_yocto("1000")
@@ -203,6 +205,11 @@ impl TestAccount {
                 "outcome_tags": empty_string_vec(outcomes),
                 "categories": empty_string_vec(outcomes),
                 "end_time": env_time(),
+                "sources": vec![Source {
+                    end_point: empty_string(),
+                    source_path: empty_string()
+                }],
+                "challenge_period": U64(1000),
                 "resolution_time": env_time(),
                 "collateral_token_id": TOKEN_CONTRACT_ID,
                 "swap_fee": fee_opt,
@@ -346,7 +353,7 @@ impl TestAccount {
             1,
             DEFAULT_GAS
         );
-        // println!("{:?}", res);
+
         assert!(res.is_ok(), "ft_transfer_call failed with res: {:?}", res);
         res
     }

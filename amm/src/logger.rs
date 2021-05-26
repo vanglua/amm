@@ -1,5 +1,5 @@
 #![allow(clippy::too_many_arguments, clippy::ptr_arg)]
-use crate:: *;
+use crate::*;
 use near_sdk::serde_json::json;
 use outcome_token::MintableToken;
 
@@ -197,7 +197,7 @@ pub fn log_create_market(
     extra_info: &String,  
     outcome_tags: &Vec<String>,
     categories: &Vec<String>,
-    is_scalar: Option<bool>,
+    is_scalar: bool,
 ) {
 	env::log(
 		json!({
@@ -215,7 +215,8 @@ pub fn log_create_market(
                 "payout_numerator": market.payout_numerator,
                 "categories": categories,
                 "creation_date": U64(ns_to_ms(env::block_timestamp())),
-                "is_scalar": is_scalar.unwrap_or(false),
+                "enabled": market.enabled,
+                "is_scalar": is_scalar,
 			}
 		})
 		.to_string()
@@ -231,7 +232,8 @@ pub fn log_market_status(market: &Market) {
             "cap_id": format!("m_{}", market.pool.id),
 			"params": {
                 "payout_numerator": market.payout_numerator,
-                "finalized": market.finalized
+                "finalized": market.finalized,
+                "enabled": market.enabled,
 			}
 		})
 		.to_string()

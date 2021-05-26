@@ -517,9 +517,11 @@ mod market_basic_tests {
                 categories: empty_string_vec(2), // categories
                 end_time: 1609951265967.into(), // end_time
                 resolution_time: 1619882574000.into(), // resolution_time (~1 day after end_time)
+                sources: vec![Source{end_point: "test".to_string(), source_path: "test".to_string()}],
                 collateral_token_id: token(), // collateral_token_id
                 swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
+                challenge_period: U64(1),
+                is_scalar: false, // is_scalar,
             }
         );
     }
@@ -542,11 +544,13 @@ mod market_basic_tests {
                 outcomes: 2, // outcomes
                 outcome_tags: empty_string_vec(2), // outcome tags
                 categories: empty_string_vec(2), // categories
+                sources: vec![Source{end_point: "test".to_string(), source_path: "test".to_string()}],
                 end_time: 1609951265967.into(), // end_time
                 resolution_time: 1619882574000.into(), // resolution_time (~1 day after end_time)
                 collateral_token_id: token(), // collateral_token_id
                 swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
+                challenge_period: U64(1),
+                is_scalar: false // is_scalar
             }
         );
 
@@ -587,10 +591,12 @@ mod market_basic_tests {
                 outcome_tags: empty_string_vec(2), // outcome tags
                 categories: empty_string_vec(2), // categories
                 end_time: 1609951265967.into(), // end_time
+                sources: vec![Source{end_point: "test".to_string(), source_path: "test".to_string()}],
                 resolution_time: 1609951265965.into(), // resolution_time (~1 day after end_time)
                 collateral_token_id: token(), // collateral_token_id
                 swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
+                challenge_period: U64(1),
+                is_scalar: false // is_scalar
             }
         );
     }
@@ -661,6 +667,7 @@ mod market_basic_tests {
             &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info
+                sources: vec![Source{end_point: "test".to_string(), source_path: "test".to_string()}],
                 outcomes: 2, // outcomes
                 outcome_tags: empty_string_vec(2), // outcome tags
                 categories: empty_string_vec(2), // categories
@@ -668,7 +675,8 @@ mod market_basic_tests {
                 resolution_time: 1619882574000.into(), // resolution_time (~1 day after end_time)
                 collateral_token_id: token(), // collateral_token_id
                 swap_fee: (10_u128.pow(24) / 50).into(), // swap fee, 2%
-                is_scalar: None // is_scalar
+                challenge_period: U64(1),
+                is_scalar: false // is_scalar
             }
         );
 

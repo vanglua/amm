@@ -19,7 +19,7 @@ use near_sdk::{
 
 near_sdk::setup_alloc!();
 
-mod types;
+pub mod types;
 mod helper;
 mod pool;
 mod logger;
