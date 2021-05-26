@@ -55,7 +55,7 @@ impl StorageManager for AMMContract {
         let amount = env::attached_deposit();
         let account_id = account_id
             .map(|a| a.into())
-            .unwrap_or_else(|| env::predecessor_account_id());
+            .unwrap_or_else(env::predecessor_account_id);
         
         let mut account = self.get_storage_account(&account_id);
 
@@ -148,7 +148,6 @@ mod mock_token_basic_tests {
     use std::convert::TryInto;
     use near_sdk::{ MockedBlockchain };
     use near_sdk::{ testing_env, VMContext };
-    use collateral_whitelist::Token;
 
     fn alice() -> AccountId {
         "alice.near".to_string()
@@ -156,10 +155,6 @@ mod mock_token_basic_tests {
 
     fn bob() -> AccountId {
         "bob.near".to_string()
-    }
-
-    fn carol() -> AccountId {
-        "carol.near".to_string()
     }
 
     fn token() -> AccountId {
@@ -172,10 +167,6 @@ mod mock_token_basic_tests {
 
     fn _target() -> AccountId {
         "target.near".to_string()
-    }
-
-    fn gov() -> AccountId {
-        "gov.near".to_string()
     }
 
     fn to_valid(account: AccountId) -> ValidAccountId {

@@ -116,7 +116,7 @@ mod mock_token_basic_tests {
 
     fn empty_string_vec(len: u16) -> Vec<String> {
         let mut tags: Vec<String> = vec![];
-        for i in 0..len {
+        for _i in 0..len {
             tags.push(empty_string());
         }
         tags
@@ -229,8 +229,5 @@ mod mock_token_basic_tests {
             }
         });
         contract.ft_on_transfer(alice(), U128(10000000000000000000), msg.to_string());
-
-        let b = contract.accounts.get(&alice());
-        // assert!(b.unwrap() < storage_start); // TODO
     }
 }

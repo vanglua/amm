@@ -1,4 +1,4 @@
-#![allow(clippy::too_many_arguments)]
+#![allow(clippy::too_many_arguments, clippy::ptr_arg)]
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{U128, U64, ValidAccountId};
 use near_sdk::collections::{Vector, UnorderedMap, LookupMap};
@@ -86,7 +86,7 @@ impl AMMContract {
             oracle: oracle.into(),
             gov: gov.into(),
             markets: Vector::new(b"m".to_vec()),
-            collateral_whitelist: collateral_whitelist, 
+            collateral_whitelist, 
             paused: false,
             accounts: LookupMap::new(b"as".to_vec()),
         }

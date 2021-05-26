@@ -445,10 +445,8 @@ impl AMMContract {
 #[cfg(test)]
 mod market_basic_tests {
     use std::convert::TryInto;
-    use near_sdk::serde_json::json;
     use near_sdk::{ MockedBlockchain };
     use near_sdk::{ testing_env, VMContext };
-    use collateral_whitelist::Token;
     use super::*;
 
     fn alice() -> AccountId {
@@ -473,7 +471,7 @@ mod market_basic_tests {
 
     fn empty_string_vec(len: u16) -> Vec<String> {
         let mut tags: Vec<String> = vec![];
-        for i in 0..len {
+        for _i in 0..len {
             tags.push(empty_string());
         }
         tags
@@ -581,7 +579,7 @@ mod market_basic_tests {
             oracle().try_into().unwrap()
         );
 
-        let market_id = contract.create_market(
+        contract.create_market(
             &CreateMarketArgs {
                 description: empty_string(), // market description
                 extra_info: empty_string(), // extra info

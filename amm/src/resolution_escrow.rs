@@ -51,7 +51,7 @@ impl ResolutionEscrows {
     }
     
     pub fn get_or_new(&self, account_id: AccountId) -> ResolutionEscrow {
-        self.escrow_accounts.get(&account_id).unwrap_or(ResolutionEscrow::new(account_id, self.pool_id))
+        self.escrow_accounts.get(&account_id).unwrap_or_else(|| ResolutionEscrow::new(account_id, self.pool_id))
     }
     
     pub fn remove(&mut self, account_id: &AccountId ) {

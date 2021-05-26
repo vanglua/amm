@@ -52,9 +52,7 @@ impl AMMContract {
         to_add: Token
     ) {
         self.assert_gov();
-        let account_id = to_add.account_id.into();
-        self.collateral_whitelist.0.insert(&account_id, &to_add.decimals);
+        self.collateral_whitelist.0.insert(&to_add.account_id, &to_add.decimals);
         logger::log_whitelist(&self.collateral_whitelist);
-
     }
 }

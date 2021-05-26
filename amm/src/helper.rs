@@ -40,10 +40,7 @@ pub(crate) fn is_promise_success() -> bool {
         1,
         "Contract expected a result on the callback"
     );
-    match env::promise_result(0) {
-        PromiseResult::Successful(_) => true,
-        _ => false,
-    }
+    matches!(env::promise_result(0), PromiseResult::Successful(_))
 }
 
 pub(crate) fn assert_prev_promise_successful() {

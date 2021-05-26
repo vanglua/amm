@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments, clippy::ptr_arg)]
 use crate:: *;
 use near_sdk::serde_json::json;
 use outcome_token::MintableToken;
